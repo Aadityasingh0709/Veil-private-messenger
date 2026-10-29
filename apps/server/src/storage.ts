@@ -5,6 +5,7 @@ import { config } from "./config.js";
 
 export interface StorageAdapter {
   save(key: string, data: Buffer): Promise<void>;
+  saveFile(key: string, sourcePath: string): Promise<void>;
   createReadStream(key: string, range?: { start: number; end: number }): fs.ReadStream;
   getSize(key: string): Promise<number>;
   delete(key: string): Promise<void>;
@@ -18,6 +19,9 @@ export class LocalStorageAdapter implements StorageAdapter {
     this.baseDir = path.resolve(baseDir);
     if (!fs.existsSync(this.baseDir)) {
       fs.mkdirSync(this.baseDir, { recursive: true });
+    }
+    if (!fs.existsSync(config.tempStorageDir)) {
+      fs.mkdirSync(config.tempStorageDir, { recursive: true });
     }
   }
 
@@ -34,6 +38,12 @@ export class LocalStorageAdapter implements StorageAdapter {
     const filePath = this.resolveSafePath(key);
     await fs.promises.mkdir(path.dirname(filePath), { recursive: true });
     await fs.promises.writeFile(filePath, data);
+  }
+
+  async saveFile(key: string, sourcePath: string): Promise<void> {
+    const filePath = this.resolveSafePath(key);
+    await fs.promises.mkdir(path.dirname(filePath), { recursive: true });
+    await fs.promises.copyFile(sourcePath, filePath);
   }
 
   createReadStream(key: string, range?: { start: number; end: number }): fs.ReadStream {

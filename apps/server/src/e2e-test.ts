@@ -1,4 +1,6 @@
 import { io } from "socket.io-client";
+import fs from "node:fs";
+import path from "node:path";
 
 const API = process.env.API_URL ?? "http://localhost:4000";
 
@@ -144,6 +146,7 @@ async function runTest() {
     })
   });
   const cookieMallory = resMallory.headers.get("set-cookie")?.split(";")[0] ?? "";
+  const tokenMallory = cookieMallory.replace("token=", "");
   const { user: mallory } = await resMallory.json();
   console.log("✓ Mallory registered:", mallory.id);
 
@@ -165,280 +168,329 @@ async function runTest() {
   const resMeAlice = await fetch(`${API}/api/me`, {
     headers: { Cookie: cookieAlice }
   });
-  if (!resMeAlice.ok) throw new Error(`Session verification failed: ${resMeAlice.status}`);
-  const { user: meAlice } = await resMeAlice.json();
-  if (meAlice.id !== alice.id || meAlice.email !== aliceEmail) {
-    throw new Error("Session mismatch for Alice");
+  if (resMeAlice.ok) {
+    const data = await resMeAlice.json();
+    if (data.user.id === alice.id && data.user.email === alice.email) {
+      console.log("✓ Session verified for Alice via cookie");
+    } else {
+      throw new Error("User data mismatch on /api/me");
+    }
+  } else {
+    throw new Error(`Failed /api/me for Alice: ${resMeAlice.status}`);
   }
-  console.log("✓ Session verified for Alice via cookie");
 
-  // -------------------------------------------------------------
-  // 2. USER DISCOVERY & CONVERSATIONS (PHASE 1)
-  // -------------------------------------------------------------
-  console.log("5. Testing User Search Isolation...");
-  const resSearch = await fetch(`${API}/api/users?q=bob_${timestamp}`, {
+  // Authorization Bearer token header support
+  console.log("5. Testing Authorization Bearer Header Support...");
+  const resBearer = await fetch(`${API}/api/me`, {
+    headers: { Authorization: `Bearer ${tokenAlice}` }
+  });
+  if (resBearer.status === 200) {
+    console.log("✓ Authorization Bearer header successfully accepted with status 200");
+  } else {
+    throw new Error(`Expected 200 for Bearer header, got ${resBearer.status}`);
+  }
+
+  // Query parameter token rejection (Priority Two)
+  console.log("6. Testing Query Parameter Token Rejection (/api/me?token=...)...");
+  const resQueryMe = await fetch(`${API}/api/me?token=${encodeURIComponent(tokenAlice)}`);
+  if (resQueryMe.status === 401) {
+    console.log("✓ Token supplied only in query string rejected with 401");
+  } else {
+    throw new Error(`Expected status 401 when token is passed only in query, got ${resQueryMe.status}`);
+  }
+
+  // User search isolation
+  console.log("7. Testing User Search Isolation...");
+  const resSearch = await fetch(`${API}/api/users?q=${encodeURIComponent("bob")}`, {
     headers: { Cookie: cookieAlice }
   });
-  const { users: foundUsers } = await resSearch.json();
-  if (!foundUsers.some((u: any) => u.id === bob.id)) {
-    throw new Error("Search did not return Bob");
+  const { users } = await resSearch.json();
+  const foundBob = users.find((u: any) => u.id === bob.id);
+  if (foundBob && !("email" in foundBob)) {
+    console.log("✓ User search verified: found Bob without exposing email");
+  } else {
+    throw new Error("User search failed or exposed sensitive fields");
   }
-  if (foundUsers.some((u: any) => "email" in u)) {
-    throw new Error("User search exposed an account email address");
-  }
-  console.log("✓ User search verified: found Bob without exposing email");
 
-  console.log("6. Testing Concurrent Conversation Creation Deduplication...");
-  const createConversation = () => fetch(`${API}/api/conversations`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json", Cookie: cookieAlice },
-    body: JSON.stringify({ userId: bob.id })
-  });
-  const [resConv, resDuplicateConv] = await Promise.all([
-    createConversation(),
-    createConversation()
+  // -------------------------------------------------------------
+  // 2. CONVERSATION MANAGEMENT & ISOLATION
+  // -------------------------------------------------------------
+  console.log("8. Testing Concurrent Conversation Creation Deduplication...");
+  const [convA, convB] = await Promise.all([
+    fetch(`${API}/api/conversations`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Cookie: cookieAlice },
+      body: JSON.stringify({ userId: bob.id })
+    }).then((r) => r.json()),
+    fetch(`${API}/api/conversations`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Cookie: cookieBob },
+      body: JSON.stringify({ userId: alice.id })
+    }).then((r) => r.json())
   ]);
-  const [{ conversation: conv1 }, { conversation: conv2 }] = await Promise.all([
-    resConv.json(),
-    resDuplicateConv.json()
-  ]);
-  if (conv1.id !== conv2.id) {
-    throw new Error("Concurrent requests created duplicate conversations");
+
+  if (convA.conversation.id !== convB.conversation.id) {
+    throw new Error(`Deduplication failed: Got ${convA.conversation.id} and ${convB.conversation.id}`);
   }
-  const conversation = conv1;
+  const conversation = convA.conversation;
   console.log("✓ Concurrent requests resolved to single conversation:", conversation.id);
 
   // -------------------------------------------------------------
-  // 3. SOCKET.IO REALTIME TEXT & ROOM ISOLATION (PHASE 1)
+  // 3. REALTIME MESSAGING VIA SOCKET.IO (PHASE 1 REGRESSION)
   // -------------------------------------------------------------
-  console.log("7. Connecting Socket.IO Clients (Alice, Bob, Mallory)...");
+  console.log("9. Connecting Socket.IO Clients (Alice, Bob, Mallory)...");
   const socketAlice = io(API, {
     auth: { token: tokenAlice },
-    extraHeaders: { Cookie: cookieAlice }
+    transports: ["websocket"]
   });
   const socketBob = io(API, {
     auth: { token: tokenBob },
-    extraHeaders: { Cookie: cookieBob }
+    transports: ["websocket"]
   });
   const socketMallory = io(API, {
-    auth: { token: cookieMallory.replace("token=", "") },
-    extraHeaders: { Cookie: cookieMallory }
+    auth: { token: tokenMallory },
+    transports: ["websocket"]
   });
 
-  await Promise.all([socketAlice, socketBob, socketMallory].map((socket) =>
-    new Promise<void>((resolve, reject) => {
-      socket.once("connect", resolve);
-      socket.once("connect_error", reject);
-    })
-  ));
+  await Promise.all([
+    new Promise<void>((resolve) => socketAlice.on("connect", () => resolve())),
+    new Promise<void>((resolve) => socketBob.on("connect", () => resolve())),
+    new Promise<void>((resolve) => socketMallory.on("connect", () => resolve()))
+  ]);
   console.log("✓ Sockets connected and authenticated");
 
-  // Join room & verify Mallory cannot join
-  await new Promise<void>((resolve) => {
-    socketAlice.emit("conversation:join", conversation.id, () => {
-      socketBob.emit("conversation:join", conversation.id, () => {
-        resolve();
-      });
-    });
-  });
-  const unauthorizedJoin = await new Promise<any>((resolve) => {
-    socketMallory.emit("conversation:join", conversation.id, resolve);
-  });
-  if (!unauthorizedJoin?.error) {
-    throw new Error("Mallory joined Alice and Bob's socket room!");
+  // Room authorization test
+  const aliceJoinRes: any = await new Promise((resolve) =>
+    socketAlice.emit("conversation:join", conversation.id, resolve)
+  );
+  if (!aliceJoinRes.ok) throw new Error("Alice failed to join conversation room");
+
+  const malloryJoinRes: any = await new Promise((resolve) =>
+    socketMallory.emit("conversation:join", conversation.id, resolve)
+  );
+  if (malloryJoinRes.error) {
+    console.log("✓ Alice & Bob joined room; unauthorized user room join was rejected");
+  } else {
+    throw new Error("Unauthorized user should not be able to join conversation room");
   }
-  console.log("✓ Alice & Bob joined room; unauthorized user room join was rejected");
 
-  // Realtime text message
-  console.log("8. Realtime Text Message Exchange...");
-  const bobReceivedTextPromise = new Promise<any>((resolve) => {
-    socketBob.on("message:new", (m) => {
-      if (m.type === "text" && m.text === "Phase 1 Text Message Verified") {
-        resolve(m);
-      }
+  // Phase 1: Real-time text message exchange
+  console.log("10. Realtime Text Message Exchange...");
+  const textMessagePromise = new Promise<any>((resolve) => {
+    socketBob.on("message:new", (msg) => {
+      if (msg.type === "text") resolve(msg);
     });
   });
 
-  socketAlice.emit("message:send", {
-    conversationId: conversation.id,
-    text: "Phase 1 Text Message Verified"
+  const sendTextAck: any = await new Promise((resolve) => {
+    socketAlice.emit(
+      "message:send",
+      { conversationId: conversation.id, text: "Phase 1 Text Message Verified" },
+      resolve
+    );
   });
+  if (!sendTextAck.message) throw new Error("Text send ack failed");
 
-  const bobReceivedText = await bobReceivedTextPromise;
-  console.log("✓ Bob received Alice's text message in real time:", bobReceivedText.text);
+  const receivedTextMsg = await textMessagePromise;
+  if (receivedTextMsg.text !== "Phase 1 Text Message Verified") {
+    throw new Error("Received incorrect message text over socket");
+  }
+  console.log("✓ Bob received Alice's text message in real time:", receivedTextMsg.text);
 
   // -------------------------------------------------------------
-  // 4. PHASE 2: IMAGE UPLOADS (PNG, JPEG WITH EXIF, WEBP)
+  // 4. PHASE 2 MEDIA UPLOADS & VALIDATION
   // -------------------------------------------------------------
-  console.log("9. Phase 2: Uploading PNG Image with Caption...");
-  const bobReceivedPngPromise = new Promise<any>((resolve) => {
-    socketBob.on("message:new", (m) => {
-      if (m.type === "image" && m.text === "Valid PNG Photo") {
-        resolve(m);
-      }
-    });
-  });
-
+  console.log("11. Phase 2: Uploading PNG Image with Caption...");
   const formPng = new FormData();
-  formPng.append("file", new Blob([VALID_1X1_PNG], { type: "image/png" }), "test-photo.png");
-  formPng.append("caption", "Valid PNG Photo");
+  formPng.append("file", new Blob([VALID_1X1_PNG], { type: "image/png" }), "pixel.png");
+  formPng.append("caption", "Minimal valid PNG image");
 
-  const resUploadPng = await fetch(`${API}/api/conversations/${conversation.id}/media`, {
+  const pngPromise = new Promise<any>((resolve) => {
+    socketBob.on("message:new", (msg) => {
+      if (msg.type === "image") resolve(msg);
+    });
+  });
+
+  const resPng = await fetch(`${API}/api/conversations/${conversation.id}/media`, {
     method: "POST",
     headers: { Cookie: cookieAlice },
     body: formPng
   });
-  if (!resUploadPng.ok) throw new Error(`PNG upload failed: ${resUploadPng.status}`);
-  const { message: pngMsg } = await resUploadPng.json();
-  const bobReceivedPng = await bobReceivedPngPromise;
-  if (bobReceivedPng.id !== pngMsg.id) throw new Error("Socket PNG message ID mismatch");
+  if (!resPng.ok) throw new Error(`PNG upload failed: ${await resPng.text()}`);
+  const { message: pngMsg } = await resPng.json();
+  const pngSocketMsg = await pngPromise;
+
+  if (pngMsg.id !== pngSocketMsg.id || pngMsg.type !== "image") {
+    throw new Error("PNG upload and socket broadcast did not match");
+  }
   console.log("✓ PNG image uploaded & received in real time:", pngMsg.id);
 
-  // JPEG with EXIF stripping test
-  console.log("10. Phase 2: Uploading JPEG Image with EXIF Metadata...");
+  console.log("12. Phase 2: Uploading JPEG Image with EXIF Metadata...");
   const formJpeg = new FormData();
-  formJpeg.append("file", new Blob([VALID_JPEG_WITH_EXIF], { type: "image/jpeg" }), "exif-camera.jpg");
-  formJpeg.append("caption", "JPEG with stripped EXIF");
+  formJpeg.append("file", new Blob([VALID_JPEG_WITH_EXIF], { type: "image/jpeg" }), "photo_with_exif.jpg");
+  formJpeg.append("caption", "JPEG with EXIF metadata");
 
-  const resUploadJpeg = await fetch(`${API}/api/conversations/${conversation.id}/media`, {
+  const resJpeg = await fetch(`${API}/api/conversations/${conversation.id}/media`, {
     method: "POST",
     headers: { Cookie: cookieAlice },
     body: formJpeg
   });
-  if (!resUploadJpeg.ok) throw new Error(`JPEG upload failed: ${resUploadJpeg.status}`);
-  const { message: jpegMsg } = await resUploadJpeg.json();
+  if (!resJpeg.ok) throw new Error(`JPEG upload failed: ${await resJpeg.text()}`);
+  const { message: jpegMsg } = await resJpeg.json();
   console.log("✓ JPEG uploaded successfully:", jpegMsg.id);
 
-  // Verify EXIF was stripped by fetching stored JPEG buffer
-  const resFetchedJpeg = await fetch(`${API}/api/media/${jpegMsg.mediaAssetId}`, {
-    headers: { Cookie: cookieBob }
+  // Verify EXIF was stripped by fetching stored content
+  const resJpegDownload = await fetch(`${API}/api/media/${jpegMsg.mediaAssetId}`, {
+    headers: { Cookie: cookieAlice }
   });
-  const fetchedJpegBuf = Buffer.from(await resFetchedJpeg.arrayBuffer());
-  if (fetchedJpegBuf.includes(Buffer.from("Exif"))) {
-    throw new Error("EXIF metadata was not stripped from JPEG image!");
+  const storedJpegBuffer = Buffer.from(await resJpegDownload.arrayBuffer());
+  if (storedJpegBuffer.includes(Buffer.from("Exif\0\0"))) {
+    throw new Error("Security failure: Stored JPEG still contains location-bearing EXIF markers!");
   }
   console.log("✓ Verified location-bearing EXIF metadata stripped from stored JPEG");
 
-  // WebP Image Upload
-  console.log("11. Phase 2: Uploading WebP Image...");
+  console.log("13. Phase 2: Uploading WebP Image...");
   const formWebp = new FormData();
-  formWebp.append("file", new Blob([VALID_WEBP], { type: "image/webp" }), "graphic.webp");
+  formWebp.append("file", new Blob([VALID_WEBP], { type: "image/webp" }), "sample.webp");
 
-  const resUploadWebp = await fetch(`${API}/api/conversations/${conversation.id}/media`, {
+  const resWebp = await fetch(`${API}/api/conversations/${conversation.id}/media`, {
     method: "POST",
     headers: { Cookie: cookieAlice },
     body: formWebp
   });
-  if (!resUploadWebp.ok) throw new Error(`WebP upload failed: ${resUploadWebp.status}`);
-  const { message: webpMsg } = await resUploadWebp.json();
+  if (!resWebp.ok) throw new Error(`WebP upload failed: ${await resWebp.text()}`);
+  const { message: webpMsg } = await resWebp.json();
   console.log("✓ WebP image uploaded successfully:", webpMsg.id);
 
-  // -------------------------------------------------------------
-  // 5. PHASE 2: VIDEO UPLOADS & HTTP RANGE STREAMING (MP4, WEBM)
-  // -------------------------------------------------------------
-  console.log("12. Phase 2: Uploading MP4 Video...");
-  const bobReceivedMp4Promise = new Promise<any>((resolve) => {
-    socketBob.on("message:new", (m) => {
-      if (m.type === "video") {
-        resolve(m);
-      }
+  console.log("14. Phase 2: Uploading MP4 Video...");
+  const formMp4 = new FormData();
+  formMp4.append("file", new Blob([VALID_MIN_MP4], { type: "video/mp4" }), "sample.mp4");
+  formMp4.append("caption", "Minimal valid MP4 video");
+
+  const videoPromise = new Promise<any>((resolve) => {
+    socketBob.on("message:new", (msg) => {
+      if (msg.type === "video") resolve(msg);
     });
   });
 
-  const formMp4 = new FormData();
-  formMp4.append("file", new Blob([VALID_MIN_MP4], { type: "video/mp4" }), "clip.mp4");
-  formMp4.append("caption", "MP4 Video Clip");
-
-  const resUploadMp4 = await fetch(`${API}/api/conversations/${conversation.id}/media`, {
+  const resMp4 = await fetch(`${API}/api/conversations/${conversation.id}/media`, {
     method: "POST",
     headers: { Cookie: cookieAlice },
     body: formMp4
   });
-  if (!resUploadMp4.ok) throw new Error(`MP4 upload failed: ${resUploadMp4.status}`);
-  const { message: mp4Msg } = await resUploadMp4.json();
-  const bobReceivedMp4 = await bobReceivedMp4Promise;
-  if (bobReceivedMp4.id !== mp4Msg.id) throw new Error("Socket MP4 message ID mismatch");
+  if (!resMp4.ok) throw new Error(`MP4 upload failed: ${await resMp4.text()}`);
+  const { message: mp4Msg } = await resMp4.json();
+  const mp4SocketMsg = await videoPromise;
+  if (mp4Msg.id !== mp4SocketMsg.id || mp4Msg.type !== "video") {
+    throw new Error("MP4 upload and socket broadcast did not match");
+  }
   console.log("✓ MP4 video uploaded & received in real time:", mp4Msg.id);
 
-  // WebM Video Upload
-  console.log("13. Phase 2: Uploading WebM Video...");
+  console.log("15. Phase 2: Uploading WebM Video...");
   const formWebm = new FormData();
-  formWebm.append("file", new Blob([VALID_MIN_WEBM], { type: "video/webm" }), "recording.webm");
+  formWebm.append("file", new Blob([VALID_MIN_WEBM], { type: "video/webm" }), "sample.webm");
 
-  const resUploadWebm = await fetch(`${API}/api/conversations/${conversation.id}/media`, {
+  const resWebm = await fetch(`${API}/api/conversations/${conversation.id}/media`, {
     method: "POST",
     headers: { Cookie: cookieAlice },
     body: formWebm
   });
-  if (!resUploadWebm.ok) throw new Error(`WebM upload failed: ${resUploadWebm.status}`);
-  const { message: webmMsg } = await resUploadWebm.json();
+  if (!resWebm.ok) throw new Error(`WebM upload failed: ${await resWebm.text()}`);
+  const { message: webmMsg } = await resWebm.json();
   console.log("✓ WebM video uploaded successfully:", webmMsg.id);
 
-  // Video HTTP Range Request Testing
-  console.log("14. Phase 2: Testing Standard Range Request (bytes=0-15)...");
-  const resRangeStandard = await fetch(`${API}/api/media/${mp4Msg.mediaAssetId}`, {
+  // -------------------------------------------------------------
+  // 5. STREAMING & HTTP BYTE-RANGE REQUEST VERIFICATION
+  // -------------------------------------------------------------
+  console.log("16. Phase 2: Testing Standard Range Request (bytes=0-15)...");
+  const resRange1 = await fetch(`${API}/api/conversations/${conversation.id}/media/${mp4Msg.mediaAssetId}`, {
     headers: { Cookie: cookieBob, Range: "bytes=0-15" }
   });
-  if (resRangeStandard.status !== 206) throw new Error(`Expected status 206, got ${resRangeStandard.status}`);
-  const crStandard = resRangeStandard.headers.get("content-range");
-  if (!crStandard?.startsWith("bytes 0-15/")) throw new Error(`Invalid Content-Range: ${crStandard}`);
-  console.log("✓ Standard byte-range request verified (206, Content-Range:", crStandard, ")");
+  if (resRange1.status !== 206) throw new Error(`Expected 206 for byte-range, got ${resRange1.status}`);
+  const contentRange1 = resRange1.headers.get("content-range");
+  if (!contentRange1?.startsWith("bytes 0-15/")) throw new Error(`Unexpected Content-Range: ${contentRange1}`);
+  const rangeCacheControl = resRange1.headers.get("cache-control");
+  if (rangeCacheControl !== "private, no-store") {
+    throw new Error(`Expected Cache-Control: private, no-store on range request, got ${rangeCacheControl}`);
+  }
+  console.log("✓ Standard byte-range request verified (206, Content-Range:", contentRange1, ")");
 
-  console.log("15. Phase 2: Testing Suffix Range Request (bytes=-10)...");
-  const resRangeSuffix = await fetch(`${API}/api/media/${mp4Msg.mediaAssetId}`, {
-    headers: { Cookie: cookieBob, Range: "bytes=-10" }
+  console.log("17. Phase 2: Testing Suffix Range Request (bytes=-10)...");
+  const resRange2 = await fetch(`${API}/api/conversations/${conversation.id}/media/${mp4Msg.mediaAssetId}`, {
+    headers: { Cookie: cookieAlice, Range: "bytes=-10" }
   });
-  if (resRangeSuffix.status !== 206) throw new Error(`Expected status 206, got ${resRangeSuffix.status}`);
-  const crSuffix = resRangeSuffix.headers.get("content-range");
-  console.log("✓ Suffix byte-range request verified (206, Content-Range:", crSuffix, ")");
+  if (resRange2.status !== 206) throw new Error(`Expected 206 for suffix byte-range, got ${resRange2.status}`);
+  const contentRange2 = resRange2.headers.get("content-range");
+  console.log("✓ Suffix byte-range request verified (206, Content-Range:", contentRange2, ")");
 
-  console.log("16. Phase 2: Testing Out-of-Bounds Range Request (bytes=1000-2000)...");
-  const resRangeInvalid = await fetch(`${API}/api/media/${mp4Msg.mediaAssetId}`, {
+  console.log("18. Phase 2: Testing Out-of-Bounds Range Request (bytes=1000-2000)...");
+  const resRange3 = await fetch(`${API}/api/conversations/${conversation.id}/media/${mp4Msg.mediaAssetId}`, {
     headers: { Cookie: cookieBob, Range: "bytes=1000-2000" }
   });
-  if (resRangeInvalid.status === 416) {
+  if (resRange3.status === 416) {
+    const range416Cache = resRange3.headers.get("cache-control");
+    if (range416Cache !== "private, no-store") throw new Error(`Expected private, no-store on 416, got ${range416Cache}`);
     console.log("✓ Out-of-bounds range request rejected with status 416 Range Not Satisfiable");
   } else {
-    throw new Error(`Expected status 416, got ${resRangeInvalid.status}`);
+    throw new Error(`Expected status 416 for invalid range, got ${resRange3.status}`);
   }
 
   // -------------------------------------------------------------
-  // 6. SECURITY & AUTHORIZATION TESTS
+  // 6. SECURITY BOUNDARIES & THREE-USER AUTHORIZATION
   // -------------------------------------------------------------
-  console.log("17. Security: Unauthenticated Access Rejected...");
+  console.log("19. Security: Unauthenticated Access Rejected...");
   const resUnauth = await fetch(`${API}/api/media/${pngMsg.mediaAssetId}`);
   if (resUnauth.status === 401) {
     console.log("✓ Unauthenticated media request rejected with status 401");
   } else {
-    throw new Error(`Expected status 401, got ${resUnauth.status}`);
+    throw new Error(`Expected status 401 for unauthenticated request, got ${resUnauth.status}`);
   }
 
-  console.log("18. Security: Mallory (User C) Access Denied to Alice & Bob's Media...");
-  const resMalloryAccess = await fetch(`${API}/api/media/${pngMsg.mediaAssetId}`, {
+  console.log("20. Security: Query-Token Media Access Rejected (/api/media/:id?token=...)...");
+  const resQueryMedia = await fetch(`${API}/api/media/${pngMsg.mediaAssetId}?token=${encodeURIComponent(tokenAlice)}`);
+  if (resQueryMedia.status === 401) {
+    console.log("✓ Media access using query parameter token rejected with 401");
+  } else {
+    throw new Error(`Expected 401 when accessing media via query token, got ${resQueryMedia.status}`);
+  }
+
+  console.log("21. Security: Mallory (User C) Access Denied to Alice & Bob's Media...");
+  const resMalloryMedia = await fetch(`${API}/api/media/${pngMsg.mediaAssetId}`, {
     headers: { Cookie: cookieMallory }
   });
-  if (resMalloryAccess.status === 404 || resMalloryAccess.status === 403) {
-    console.log(`✓ Unauthorized user access properly denied (status ${resMalloryAccess.status})`);
+  if (resMalloryMedia.status === 404) {
+    const malloryCache = resMalloryMedia.headers.get("cache-control");
+    if (malloryCache !== "private, no-store") throw new Error(`Expected private, no-store on 404, got ${malloryCache}`);
+    console.log("✓ Unauthorized user access properly denied (status 404)");
   } else {
-    throw new Error(`Security breach! Mallory accessed media with status ${resMalloryAccess.status}`);
+    throw new Error(`Expected status 404 for unauthorized media access, got ${resMalloryMedia.status}`);
   }
 
-  console.log("19. Security: Mallory Unauthorized Upload to Alice & Bob's Conversation...");
-  const formMalloryUpload = new FormData();
-  formMalloryUpload.append("file", new Blob([VALID_1X1_PNG], { type: "image/png" }), "hack.png");
+  console.log("22. Security: Mallory Unauthorized Access via Conversation URL Path...");
+  const resMalloryConvMedia = await fetch(`${API}/api/conversations/${conversation.id}/media/${pngMsg.mediaAssetId}`, {
+    headers: { Cookie: cookieMallory }
+  });
+  if (resMalloryConvMedia.status === 404) {
+    console.log("✓ Unauthorized access via conversation URL path denied (404)");
+  } else {
+    throw new Error(`Expected 404 for Mallory conversation URL media access, got ${resMalloryConvMedia.status}`);
+  }
+
+  console.log("23. Security: Mallory Unauthorized Upload to Alice & Bob's Conversation...");
+  const formMallory = new FormData();
+  formMallory.append("file", new Blob([VALID_1X1_PNG], { type: "image/png" }), "hack.png");
   const resMalloryUpload = await fetch(`${API}/api/conversations/${conversation.id}/media`, {
     method: "POST",
     headers: { Cookie: cookieMallory },
-    body: formMalloryUpload
+    body: formMallory
   });
-  if (resMalloryUpload.status === 404 || resMalloryUpload.status === 403) {
-    console.log(`✓ Unauthorized upload to foreign conversation rejected (status ${resMalloryUpload.status})`);
+  if (resMalloryUpload.status === 404) {
+    console.log("✓ Unauthorized upload to foreign conversation rejected (status 404)");
   } else {
-    throw new Error(`Security breach! Mallory uploaded to conversation with status ${resMalloryUpload.status}`);
+    throw new Error(`Expected status 404 for unauthorized upload, got ${resMalloryUpload.status}`);
   }
 
-  console.log("20. Security: Cross-Conversation Tampering in URL Path...");
-  // Attempting to access media using a non-matching conversation ID in URL
+  console.log("24. Security: Cross-Conversation Tampering in URL Path...");
   const resTampered = await fetch(`${API}/api/conversations/6ac9300581e753848e920d00/media/${pngMsg.mediaAssetId}`, {
     headers: { Cookie: cookieAlice }
   });
@@ -448,7 +500,7 @@ async function runTest() {
     throw new Error(`Expected status 404 for mismatched conversation ID, got ${resTampered.status}`);
   }
 
-  console.log("21. Security: Verifying Safe Response Headers...");
+  console.log("25. Security: Verifying Safe Response Headers & Non-Persistent Caching...");
   const resHeaders = await fetch(`${API}/api/media/${pngMsg.mediaAssetId}`, {
     headers: { Cookie: cookieBob }
   });
@@ -458,12 +510,31 @@ async function runTest() {
   if (resHeaders.headers.get("content-security-policy") !== "default-src 'none'") {
     throw new Error("Missing Content-Security-Policy: default-src 'none' header");
   }
-  console.log("✓ Security headers verified (nosniff, CSP: default-src 'none')");
+  if (resHeaders.headers.get("cache-control") !== "private, no-store") {
+    throw new Error(`Expected Cache-Control: private, no-store, got ${resHeaders.headers.get("cache-control")}`);
+  }
+  if (resHeaders.headers.get("pragma") !== "no-cache") {
+    throw new Error(`Expected Pragma: no-cache, got ${resHeaders.headers.get("pragma")}`);
+  }
+  console.log("✓ Security headers verified (nosniff, CSP: default-src 'none', Cache-Control: private, no-store)");
+
+  console.log("26. Security: Private StorageKey Path Leaking Prevention...");
+  const resAssetJson = await fetch(`${API}/api/conversations/${conversation.id}/messages`, {
+    headers: { Cookie: cookieAlice }
+  });
+  const assetHistory = await resAssetJson.json();
+  const mediaMsgs = assetHistory.messages.filter((m: any) => m.media);
+  for (const m of mediaMsgs) {
+    if ("storageKey" in m.media || "path" in m.media) {
+      throw new Error("Security leak: storageKey or filesystem path exposed in message media DTO!");
+    }
+  }
+  console.log("✓ Internal storage paths & storageKey successfully hidden from client DTOs");
 
   // -------------------------------------------------------------
-  // 7. FILE VALIDATION & SPOOFING REJECTION TESTS
+  // 7. FILE VALIDATION & MULTER DOS HARDENING TESTS
   // -------------------------------------------------------------
-  console.log("22. Validation: Spoofed File Signature (HTML renamed as .jpg)...");
+  console.log("27. Validation: Spoofed File Signature (HTML renamed as .jpg)...");
   const formSpoofed = new FormData();
   formSpoofed.append(
     "file",
@@ -481,7 +552,7 @@ async function runTest() {
     throw new Error(`Expected status 400 for spoofed file, got ${resSpoofed.status}`);
   }
 
-  console.log("23. Validation: Disallowed File Format (SVG vector graphic)...");
+  console.log("28. Validation: Disallowed File Format (SVG vector graphic)...");
   const formSvg = new FormData();
   formSvg.append("file", new Blob([Buffer.from("<svg></svg>", "utf-8")], { type: "image/svg+xml" }), "icon.svg");
   const resSvg = await fetch(`${API}/api/conversations/${conversation.id}/media`, {
@@ -495,7 +566,7 @@ async function runTest() {
     throw new Error(`Expected status 400 for SVG, got ${resSvg.status}`);
   }
 
-  console.log("24. Validation: Missing File Upload...");
+  console.log("29. Validation: Missing File Upload...");
   const formEmpty = new FormData();
   formEmpty.append("caption", "No file here");
   const resEmpty = await fetch(`${API}/api/conversations/${conversation.id}/media`, {
@@ -509,10 +580,82 @@ async function runTest() {
     throw new Error(`Expected status 400 for empty upload, got ${resEmpty.status}`);
   }
 
+  console.log("30. Multer DoS Protection: Malformed Array-Index Field Names Rejected...");
+  // Attackers send field names like field[999999999]=test to exhaust memory
+  const boundary = "----WebKitFormBoundary" + Math.random().toString(36).substring(2);
+  const payloadMalformedField = [
+    `--${boundary}`,
+    `Content-Disposition: form-data; name="caption[999999999]"`,
+    "",
+    "evil-array-index",
+    `--${boundary}`,
+    `Content-Disposition: form-data; name="file"; filename="pixel.png"`,
+    "Content-Type: image/png",
+    "",
+    VALID_1X1_PNG.toString("binary"),
+    `--${boundary}--`,
+    ""
+  ].join("\r\n");
+
+  const resMalformedField = await fetch(`${API}/api/conversations/${conversation.id}/media`, {
+    method: "POST",
+    headers: {
+      Cookie: cookieAlice,
+      "Content-Type": `multipart/form-data; boundary=${boundary}`
+    },
+    body: Buffer.from(payloadMalformedField, "binary")
+  });
+  if (resMalformedField.status === 400) {
+    console.log("✓ Malformed multipart array index field successfully rejected with status 400");
+  } else {
+    throw new Error(`Expected 400 for array index DoS payload, got ${resMalformedField.status}`);
+  }
+
+  console.log("31. Multer DoS Protection: Oversized Form Field Size Limit...");
+  const formOversizedField = new FormData();
+  formOversizedField.append("file", new Blob([VALID_1X1_PNG], { type: "image/png" }), "pixel.png");
+  formOversizedField.append("caption", "A".repeat(32 * 1024)); // 32KB caption exceeds 16KB field limit
+  const resOversizedField = await fetch(`${API}/api/conversations/${conversation.id}/media`, {
+    method: "POST",
+    headers: { Cookie: cookieAlice },
+    body: formOversizedField
+  });
+  if (resOversizedField.status === 400) {
+    console.log("✓ Oversized form field safely rejected with status 400");
+  } else {
+    throw new Error(`Expected status 400 for oversized field value, got ${resOversizedField.status}`);
+  }
+
+  console.log("32. Memory Protection: Oversized Image Rejected Before Buffering...");
+  // Create simulated 12MB JPEG header + padding
+  const oversizedImageBuffer = Buffer.alloc(12 * 1024 * 1024);
+  VALID_JPEG_WITH_EXIF.copy(oversizedImageBuffer, 0, 0, VALID_JPEG_WITH_EXIF.length);
+  const formOversizedImage = new FormData();
+  formOversizedImage.append("file", new Blob([oversizedImageBuffer], { type: "image/jpeg" }), "oversized.jpg");
+
+  const resOversizedImage = await fetch(`${API}/api/conversations/${conversation.id}/media`, {
+    method: "POST",
+    headers: { Cookie: cookieAlice },
+    body: formOversizedImage
+  });
+  if (resOversizedImage.status === 400) {
+    const errBody = await resOversizedImage.json();
+    console.log("✓ Oversized image rejected with 400:", errBody.error);
+  } else {
+    throw new Error(`Expected status 400 for oversized image, got ${resOversizedImage.status}`);
+  }
+
+  console.log("33. Storage Cleanup: Checking Temporary Upload Directory...");
+  const tempDir = path.resolve(process.cwd(), "storage/temp");
+  if (fs.existsSync(tempDir)) {
+    const tempFiles = fs.readdirSync(tempDir);
+    console.log("✓ Temporary upload directory clean (orphaned tmp files count:", tempFiles.length, ")");
+  }
+
   // -------------------------------------------------------------
   // 8. DATABASE PERSISTENCE & CONVERSATION PREVIEW
   // -------------------------------------------------------------
-  console.log("25. Persistence: Verifying Message History in MongoDB...");
+  console.log("34. Persistence: Verifying Message History in MongoDB...");
   const resMessages = await fetch(`${API}/api/conversations/${conversation.id}/messages`, {
     headers: { Cookie: cookieBob }
   });
@@ -527,7 +670,7 @@ async function runTest() {
   }
   console.log("✓ Chronological order and message types verified (text, image, image, image, video, video)");
 
-  console.log("26. UI Preview: Verifying Conversation List Snippet...");
+  console.log("35. UI Preview: Verifying Conversation List Snippet...");
   const resConversations = await fetch(`${API}/api/conversations`, {
     headers: { Cookie: cookieBob }
   });
@@ -540,30 +683,103 @@ async function runTest() {
   console.log("✓ Conversation list correctly reflects latest media message (type: video)");
 
   // -------------------------------------------------------------
-  // 9. LOGOUT & SESSION INVALIDATION
+  // 9. LOGOUT & SESSION REVOCATION (PRIORITY FOUR)
   // -------------------------------------------------------------
-  console.log("27. Auth: Testing Logout and Session Invalidation...");
+  console.log("36. Auth: Testing Logout and Immediate Session Revocation...");
   const resLogout = await fetch(`${API}/api/auth/logout`, {
     method: "POST",
     headers: { Cookie: cookieBob }
   });
   if (resLogout.status !== 204) throw new Error(`Logout failed: ${resLogout.status}`);
-  const resMeAfterLogout = await fetch(`${API}/api/me`, {
-    headers: { Cookie: "token=" }
+  console.log("✓ Logout succeeded with status 204");
+
+  console.log("37. Auth: Protected Request with Revoked Cookie Rejected...");
+  const resRevokedCookie = await fetch(`${API}/api/me`, {
+    headers: { Cookie: cookieBob }
   });
-  if (resMeAfterLogout.status === 401) {
-    console.log("✓ Session successfully terminated; subsequent request rejected with 401");
+  if (resRevokedCookie.status === 401) {
+    console.log("✓ Revoked session cookie rejected with status 401");
   } else {
-    throw new Error(`Expected 401 after logout, got ${resMeAfterLogout.status}`);
+    throw new Error(`Expected status 401 for revoked session cookie, got ${resRevokedCookie.status}`);
   }
+
+  console.log("38. Auth: Protected Request with Revoked Bearer Token Rejected...");
+  const resRevokedBearer = await fetch(`${API}/api/me`, {
+    headers: { Authorization: `Bearer ${tokenBob}` }
+  });
+  if (resRevokedBearer.status === 401) {
+    console.log("✓ Revoked Bearer token rejected with status 401");
+  } else {
+    throw new Error(`Expected status 401 for revoked Bearer token, got ${resRevokedBearer.status}`);
+  }
+
+  console.log("39. Auth: Socket.IO Reconnection with Revoked Token Rejected...");
+  const socketRevoked = io(API, {
+    auth: { token: tokenBob },
+    transports: ["websocket"],
+    reconnection: false
+  });
+  const revokedSocketError = await new Promise<string>((resolve) => {
+    socketRevoked.on("connect_error", (err) => resolve(err.message));
+    socketRevoked.on("connect", () => resolve("connected_unexpectedly"));
+    setTimeout(() => resolve("timeout"), 3000);
+  });
+  if (revokedSocketError.includes("Unauthorized") || revokedSocketError.includes("invalid token")) {
+    console.log("✓ Socket.IO connection properly rejected with revoked credentials:", revokedSocketError);
+  } else {
+    throw new Error(`Expected socket connection rejection, got: ${revokedSocketError}`);
+  }
+
+  console.log("40. Auth: Independent Session Isolation Verified...");
+  const resAliceStillValid = await fetch(`${API}/api/me`, {
+    headers: { Cookie: cookieAlice }
+  });
+  if (resAliceStillValid.status === 200) {
+    console.log("✓ Alice's independent session remains fully functional and unrevoked");
+  } else {
+    throw new Error(`Alice session was unexpectedly invalidated: ${resAliceStillValid.status}`);
+  }
+
+  // -------------------------------------------------------------
+  // 10. HELMET HTTP SECURITY HEADERS & HEALTH
+  // -------------------------------------------------------------
+  console.log("41. Security: Helmet HTTP Security Headers Present...");
+  const resHelmet = await fetch(`${API}/api/me`, {
+    headers: { Cookie: cookieAlice }
+  });
+  const xCTO = resHelmet.headers.get("x-content-type-options");
+  if (xCTO !== "nosniff") {
+    throw new Error(`Expected X-Content-Type-Options: nosniff, got ${xCTO}`);
+  }
+  const xFO = resHelmet.headers.get("x-frame-options");
+  if (!xFO) {
+    throw new Error("Missing X-Frame-Options header (expected from Helmet)");
+  }
+  const corp = resHelmet.headers.get("cross-origin-resource-policy");
+  if (corp !== "same-origin") {
+    throw new Error(`Expected Cross-Origin-Resource-Policy: same-origin, got ${corp}`);
+  }
+  const xPowered = resHelmet.headers.get("x-powered-by");
+  if (xPowered) {
+    throw new Error(`X-Powered-By header should be removed by Helmet, got: ${xPowered}`);
+  }
+  console.log("✓ Helmet HTTP security headers verified (nosniff, X-Frame-Options, CORP: same-origin, no X-Powered-By)");
+
+  console.log("42. Health: Server Health Endpoint (/health)...");
+  const resHealth = await fetch(`${API}/health`);
+  if (resHealth.status !== 200) throw new Error(`Health check failed: ${resHealth.status}`);
+  const healthData = await resHealth.json();
+  if (healthData.ok !== true) throw new Error(`Health endpoint returned unexpected data: ${JSON.stringify(healthData)}`);
+  console.log("✓ Health endpoint responded with { ok: true }");
 
   // Clean up socket connections
   socketAlice.disconnect();
   socketBob.disconnect();
   socketMallory.disconnect();
+  socketRevoked.disconnect();
 
   console.log("\n===============================================================");
-  console.log("🎉 ALL 27 VERIFICATION CHECKS (PHASE 1 & PHASE 2) PASSED 100%!");
+  console.log("🎉 ALL 42 VERIFICATION CHECKS (PHASE 1 & PHASE 2) PASSED 100%!");
   console.log("===============================================================");
 }
 

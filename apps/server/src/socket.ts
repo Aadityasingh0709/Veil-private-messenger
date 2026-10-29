@@ -1,6 +1,6 @@
 import type { Server, Socket } from "socket.io";
 import { messageSchema, typingSchema } from "@secure-chat/shared";
-import { verifyToken } from "./auth.js";
+import { isTokenRevoked, verifyToken } from "./auth.js";
 import { Conversation, Message, User } from "./models.js";
 import { messageDto } from "./serializers.js";
 
@@ -22,16 +22,33 @@ const withSocketErrorHandling = <Args extends unknown[]>(
 let ioInstance: Server | null = null;
 export const getIO = (): Server | null => ioInstance;
 
+export const disconnectSessionSockets = async (jti: string) => {
+  if (!ioInstance || !jti) return;
+  try {
+    const sockets = await ioInstance.fetchSockets();
+    for (const s of sockets) {
+      if (s.data?.jti === jti) {
+        s.emit("session:revoked", { error: "Session has been logged out" });
+        s.disconnect(true);
+      }
+    }
+  } catch (err: any) {
+    console.error("Error disconnecting revoked session sockets:", err.message);
+  }
+};
+
 export const configureSockets = (io: Server) => {
   ioInstance = io;
   // Authenticate socket connection via cookie or handshake auth
-  io.use((socket, next) => {
+  io.use(async (socket, next) => {
     try {
       const cookieHeader = socket.handshake.headers.cookie;
       const cookieToken = cookieHeader?.match(/(?:^|; )token=([^;]+)/)?.[1];
       const token = socket.handshake.auth?.token ?? cookieToken;
       if (!token) return next(new Error("Unauthorized: missing token"));
-      socket.data.userId = verifyToken(decodeURIComponent(token));
+      const { userId, jti } = await verifyToken(decodeURIComponent(token));
+      socket.data.userId = userId;
+      socket.data.jti = jti;
       next();
     } catch {
       next(new Error("Unauthorized: invalid token"));
@@ -40,7 +57,18 @@ export const configureSockets = (io: Server) => {
 
   io.on("connection", async (socket: Socket) => {
     const userId = socket.data.userId as string;
+    const jti = socket.data.jti as string;
     socket.join(`user:${userId}`);
+
+    // Verify session has not been revoked on every incoming packet
+    socket.use(async (_packet, next) => {
+      if (await isTokenRevoked(jti)) {
+        socket.emit("session:revoked", { error: "Session has been logged out" });
+        socket.disconnect(true);
+        return next(new Error("Unauthorized: session revoked"));
+      }
+      next();
+    });
 
     // Update presence to online
     try {

@@ -44,10 +44,13 @@ export const messageDto = (m: any): MessageDto => {
   };
 };
 
-export const conversationDto = (c: any): ConversationDto => ({
-  id: String(c._id),
-  participants: c.participants.map(userDto),
-  ...(c.lastMessage ? { lastMessage: messageDto(c.lastMessage) } : {}),
-  ...(c.lastMessageAt ? { lastMessageAt: new Date(c.lastMessageAt).toISOString() } : {}),
-  updatedAt: new Date(c.updatedAt).toISOString()
-});
+export const conversationDto = (c: any): ConversationDto => {
+  const isPopulatedMessage = Boolean(c.lastMessage && typeof c.lastMessage === "object" && c.lastMessage.createdAt);
+  return {
+    id: String(c._id),
+    participants: (c.participants || []).map(userDto),
+    ...(isPopulatedMessage ? { lastMessage: messageDto(c.lastMessage) } : {}),
+    ...(c.lastMessageAt ? { lastMessageAt: new Date(c.lastMessageAt).toISOString() } : {}),
+    updatedAt: new Date(c.updatedAt).toISOString()
+  };
+};

@@ -15,6 +15,9 @@ const maxVideoSizeBytes = Number(process.env.MAX_VIDEO_SIZE_BYTES) || 100 * 1024
 const mediaStorageDir = process.env.MEDIA_STORAGE_DIR
   ? path.resolve(process.env.MEDIA_STORAGE_DIR)
   : path.resolve(process.cwd(), "storage/media");
+const tempStorageDir = process.env.TEMP_STORAGE_DIR
+  ? path.resolve(process.env.TEMP_STORAGE_DIR)
+  : path.resolve(process.cwd(), "storage/temp");
 
 export const config = {
   port,
@@ -24,5 +27,6 @@ export const config = {
   isProduction: process.env.NODE_ENV === "production",
   maxImageSizeBytes,
   maxVideoSizeBytes,
-  mediaStorageDir
+  mediaStorageDir,
+  tempStorageDir
 };

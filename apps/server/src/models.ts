@@ -41,3 +41,13 @@ export const User = model("User", userSchema);
 export const Conversation = model("Conversation", conversationSchema);
 export const MediaAsset = model("MediaAsset", mediaAssetSchema);
 export const Message = model("Message", messageSchema);
+
+const revokedTokenSchema = new Schema({
+  jti: { type: String, required: true, unique: true, index: true },
+  userId: { type: Schema.Types.ObjectId, ref: "User", index: true },
+  expiresAt: { type: Date, required: true }
+}, { timestamps: true });
+revokedTokenSchema.index({ expiresAt: 1 }, { expireAfterSeconds: 0 });
+
+export const RevokedToken = model("RevokedToken", revokedTokenSchema);
+
