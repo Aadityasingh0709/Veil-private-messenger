@@ -1,53 +1,54 @@
 <p align="center">
+  <img src="https://img.shields.io/badge/Kotlin-7F52FF?logo=kotlin&logoColor=white" alt="Kotlin" />
+  <img src="https://img.shields.io/badge/Jetpack%20Compose-4285F4?logo=jetpackcompose&logoColor=white" alt="Jetpack Compose" />
+  <img src="https://img.shields.io/badge/Android%20SDK-3DDC84?logo=android&logoColor=white" alt="Android SDK" />
   <img src="https://img.shields.io/badge/TypeScript-3178C6?logo=typescript&logoColor=white" alt="TypeScript" />
   <img src="https://img.shields.io/badge/React-61DAFB?logo=react&logoColor=black" alt="React" />
   <img src="https://img.shields.io/badge/Express-000000?logo=express&logoColor=white" alt="Express" />
   <img src="https://img.shields.io/badge/Socket.IO-010101?logo=socketdotio&logoColor=white" alt="Socket.IO" />
   <img src="https://img.shields.io/badge/MongoDB-47A248?logo=mongodb&logoColor=white" alt="MongoDB" />
-  <img src="https://img.shields.io/badge/Vite-646CFF?logo=vite&logoColor=white" alt="Vite" />
   <img src="https://img.shields.io/badge/License-MIT-blue.svg" alt="MIT License" />
 </p>
 
 # 🔒 Private Messenger
 
-> A privacy-focused, real-time one-to-one messaging platform with secure media sharing, built from the ground up with security as a first-class citizen.
+> A privacy-focused communication platform combining full-featured real-time messaging with native mobile digital capture protection and optical anti-capture research.
 
-Private Messenger is designed for sensitive, direct communication — combining real-time text chat with hardened media upload, validation, and streaming. The platform prioritizes user privacy through EXIF metadata stripping, magic-byte file validation, private storage isolation, and content-security hardened media delivery.
+Private Messenger is designed from the ground up for high-security, sensitive communication workflows across web and native Android platforms. The platform protects visual content across both software layers (using OS compositor controls and screenshot detection) and hardware boundaries (preparing the foundation for optical anti-capture rendering against physical cameras).
 
 ---
 
-## ✨ Features
+## ✨ Features by Phase
 
-### Core Messaging
-- **Real-time text messaging** — instant delivery via Socket.IO with typing indicators and read receipts
-- **Persistent conversations** — full message history stored in MongoDB with chronological ordering
-- **Message deletion** — hide messages for yourself or let the sender tombstone a message for both participants, synchronized in real time
-- **Emoji picker** — searchable Unicode emoji categories, recent emojis, and cursor-aware insertion into ordinary messages
-- **User presence** — live online/offline status with last-seen timestamps
-- **User discovery** — search by name or username without exposing email addresses
+### 📱 Native Android Capture Protection *(Phase 3 — Current)*
+- **Standalone SDK (`capture-protection`)** — Reusable, decoupled Kotlin library (`.aar`) with zero UI or navigation dependencies.
+- **Reference-Counted Window Protection** — `SecureWindowController` enforces `WindowManager.LayoutParams.FLAG_SECURE` at the OS compositor level.
+- **Pre-Existing Flag Preservation** — Respects baseline window flags so SDK session cleanups never strip pre-existing security states.
+- **Thread & Lifecycle Safety** — Thread-safe session registry, automatic dispatch to the main looper, and automated cleanup on Activity destroy via `DefaultLifecycleObserver`.
+- **Android 14+ Screenshot Detection** — `ScreenshotDetectionController` integrates native `Activity.ScreenCaptureCallback` with safe fallback on older Android versions.
+- **Interactive Verification Demo App (`protection-demo`)** — 100% Jetpack Compose and Material 3 application:
+  - **Protection Dashboard**: Live hardware diagnostics, API level, and SDK status monitor.
+  - **Normal Viewer**: Baseline unprotected document for screenshot comparison.
+  - **Protected Viewer**: Dedicated Activity demonstrating isolated window protection, blocking hardware screenshots, blanking video recordings, and censoring task-switcher previews.
+  - **Screenshot Detection Demo**: Live event monitor tracking Android 14+ screenshot capture callbacks.
+  - **Capture Testing Lab**: Interactive QA checklist to test and record `PASS`/`FAIL` outcomes for 6 physical verification checkpoints and export markdown logs to clipboard.
+  - **SDK Information & Platform Limits**: Educational guide explaining SurfaceFlinger mechanics, OEM variations, and why software flags cannot block physical camera lenses.
 
-### Secure Media Sharing *(Phase 2)*
-- **Image support** — JPEG, PNG, WebP (up to 10 MB)
-- **Video support** — MP4, WebM (up to 100 MB)
-- **Magic-byte validation** — real file signature inspection prevents MIME/extension spoofing
-- **EXIF stripping** — location-bearing metadata automatically removed from images on upload
-- **Private storage** — files stored outside public directories with server-generated keys
-- **Byte-range streaming** — HTTP `206 Partial Content` for video seeking and progressive buffering
-- **Custom media viewer** — in-app fullscreen modal with image scaling, video playback controls, and keyboard navigation
+### 🖼️ Secure Media Sharing *(Phase 2)*
+- **Image Support** — JPEG, PNG, WebP (up to 10 MB) with EXIF/GPS metadata stripping on upload.
+- **Video Support** — MP4, WebM (up to 100 MB) with HTTP `206 Partial Content` byte-range streaming for seeking and progressive buffering.
+- **Magic-Byte Signature Inspection** — Real file signature validation prevents MIME and extension spoofing.
+- **Private Storage Isolation** — Media stored outside public web roots with server-generated opaque keys.
+- **Custom Media Viewer** — In-app fullscreen modal with image zoom/scale, video playback controls, and keyboard navigation.
+- **Message Deletion & Tombstoning** — Real-time soft-delete for myself or sender-only tombstone ("This message was deleted.") for both participants.
+- **Unicode Emoji Picker** — Built-in categorized picker with recent emojis, keyboard shortcuts, and cursor-aware insertion.
 
-### Native Android Capture Protection *(Phase 3)*
-- **Standalone SDK (`capture-protection`)** — reusable Kotlin library (`.aar`) with zero UI coupling
-- **Reference-counted window security** — multi-session `FLAG_SECURE` management via `SecureWindowController`
-- **Pre-existing flag preservation** — protects baseline window flags from premature clearing
-- **Main-thread safe & lifecycle-aware** — automatic dispatch to main looper and cleanup on activity destroy
-- **Screenshot detection (Android 14+)** — native `Activity.ScreenCaptureCallback` integration with safe fallback on older versions
-- **Verification demo app (`protection-demo`)** — 100% Jetpack Compose & Material 3 testbed featuring Normal Viewer baseline, Protected Viewer, Screenshot Detection monitor, and interactive QA testing lab
-
-### Authentication & Security
-- **Session-based auth** — JWT tokens in HTTP-only cookies with durable revocation, fail-closed revocation checks, and Argon2 password hashing
-- **Rate limiting** — configurable request throttling via `express-rate-limit`
-- **Conversation isolation** — strict participant verification on every message and media request
-- **Private media** — authorization on every fetch, `Cache-Control: private, no-store`, strict content headers, bounded disk uploads, and signature checks
+### 💬 Core Messaging *(Phase 1)*
+- **Real-Time Messaging** — Instant duplex delivery via Socket.IO with typing indicators and read receipts.
+- **Persistent History** — Chronological conversation storage in MongoDB with user isolation.
+- **Presence Tracking** — Real-time online/offline indicators and last-seen timestamps.
+- **User Discovery** — Search users by name or username without exposing email addresses.
+- **Robust Authentication** — Argon2id password hashing, HTTP-only session cookies, and durable, fail-closed JWT revocation.
 
 ---
 
@@ -56,227 +57,226 @@ Private Messenger is designed for sensitive, direct communication — combining 
 ```
 private-messenger/
 ├── apps/
-│   ├── android-protection/   # Native Android Capture Protection (Phase 3)
-│   │   ├── capture-protection/ # Reusable Android Library Module (AAR)
-│   │   └── protection-demo/    # Jetpack Compose Demo App (APK)
-│   ├── server/               # Express + Socket.IO backend API
+│   ├── android-protection/          # Native Android Protection Project (Phase 3)
+│   │   ├── capture-protection/      # Reusable Android Library Module (Release AAR)
+│   │   │   └── src/main/kotlin/com/securechat/protection/
+│   │   │       ├── SecureWindowController.kt
+│   │   │       ├── ProtectionSession.kt
+│   │   │       ├── ProtectionConfig.kt
+│   │   │       ├── ProtectionStatus.kt
+│   │   │       └── ScreenshotDetectionController.kt
+│   │   ├── protection-demo/         # Jetpack Compose Demo Application (Debug APK)
+│   │   │   └── src/main/kotlin/com/securechat/demo/
+│   │   │       ├── MainActivity.kt
+│   │   │       ├── ProtectedViewerActivity.kt
+│   │   │       └── ui/ (HomeScreen, ProtectedViewerScreen, TestingLabScreen, etc.)
+│   │   ├── build.gradle.kts
+│   │   ├── settings.gradle.kts
+│   │   ├── gradle.properties
+│   │   └── gradlew / gradlew.bat
+│   ├── server/                      # Express + Socket.IO Backend API
 │   │   └── src/
-│   │       ├── index.ts          # Server entry point
-│   │       ├── routes.ts         # REST API routes & media streaming
-│   │       ├── socket.ts         # Socket.IO event handlers
-│   │       ├── models.ts         # Mongoose schemas (User, Conversation, Message, MediaAsset)
-│   │       ├── auth.ts            # JWT validation, revocation, and auth middleware
-│   │       ├── storage.ts        # Storage adapter for media persistence
-│   │       ├── serializers.ts    # DTO serializers for API responses
-│   │       ├── seed.ts           # Demo data seeder
-│   │       ├── e2e-test.ts       # API integration, authorization, deletion, and emoji tests
-│   │       └── browser-e2e.ts    # Playwright image, video, emoji, and deletion tests
-│   └── web/                  # React + Vite frontend SPA
+│   │       ├── index.ts             # Server entry point
+│   │       ├── routes.ts            # REST routes & streaming endpoints
+│   │       ├── socket.ts            # Real-time event handlers
+│   │       ├── models.ts            # Mongoose schemas
+│   │       ├── auth.ts              # JWT authentication & revocation
+│   │       └── storage.ts           # Media filesystem adapter
+│   └── web/                         # React + Vite Web Client SPA
 │       └── src/
-│           ├── App.tsx           # Main app shell with routing
-│           ├── api.ts            # HTTP client wrapper
-│           ├── styles.css        # Global styles (Inter font, dark theme)
-│           └── components/
-│               ├── AuthForm.tsx        # Login / Registration
-│               ├── ChatList.tsx        # Conversation sidebar
-│               ├── MessageBubble.tsx   # Text & media message rendering
-│               ├── MessageComposer.tsx # Text, emoji picker & media upload
-│               ├── MediaViewer.tsx     # Fullscreen media viewer modal
-│               ├── UserSearch.tsx      # User discovery search
-│               ├── Navigation.tsx      # Sidebar navigation
-│               ├── ProfileModal.tsx    # User profile dialog
-│               ├── Avatar.tsx          # User avatar with status indicator
-│               └── States.tsx          # Loading, empty, error states
+│           ├── App.tsx              # Application shell with isolated scrolling
+│           ├── api.ts               # HTTP client wrapper
+│           ├── styles.css           # Vanilla CSS design system
+│           └── components/          # Reusable UI components
 ├── packages/
-│   └── shared/               # Shared validation schemas & type contracts
-│       └── src/index.ts          # Zod schemas, MIME allowlists, DTO types
+│   └── shared/                      # Shared TypeScript contracts & schemas
 ├── docs/
-│   ├── PROJECT_VISION.md              # Multi-phase roadmap & research notes
-│   ├── PROJECT_STATUS.md              # Phase completion audit & test results
-│   └── PHASE3_ANDROID_PROTECTION.md   # Android SDK API & verification guide
-└── package.json              # Workspace root (npm workspaces)
+│   ├── PROJECT_VISION.md            # Master 9-phase roadmap & research vision
+│   ├── PROJECT_STATUS.md            # Comprehensive phase audit & status
+│   └── PHASE3_ANDROID_PROTECTION.md # Android SDK technical specification & API guide
+├── .github/workflows/
+│   └── ci.yml                       # Dual CI pipeline (Node.js + Android SDK)
+└── package.json                     # Monorepo root workspace
 ```
-
-The monorepo encompasses both web messaging and native mobile security modules:
-
-| Module / Package | Scope | Description |
-|------------------|-------|-------------|
-| `@secure-chat/server` | `apps/server` | Express REST API + Socket.IO real-time server |
-| `@secure-chat/web` | `apps/web` | React SPA built with Vite |
-| `@secure-chat/shared` | `packages/shared` | Zod validation schemas, MIME allowlists, and shared TypeScript types |
-| `capture-protection` | `apps/android-protection/capture-protection` | Reusable Kotlin Android Library producing release AAR |
-| `protection-demo` | `apps/android-protection/protection-demo` | Jetpack Compose testbed application producing debug APK |
 
 ---
 
 ## 🚀 Getting Started
 
-### Prerequisites
+### 1. Web Application & Backend API
 
-| Requirement | Version |
-|-------------|---------|
-| [Node.js](https://nodejs.org/) | 24 LTS |
-| [MongoDB](https://www.mongodb.com/try/download/community) | 6+ (running locally) |
+#### Prerequisites
+- **Node.js**: v20+ (v24 LTS recommended)
+- **MongoDB**: v6+ (running locally at `mongodb://127.0.0.1:27017`)
 
-### Installation
-
+#### Setup & Launch
 ```bash
 # Clone the repository
 git clone https://github.com/Aadityasingh0709/private-messenger.git
 cd private-messenger
 
-# Install the exact locked workspace dependencies
+# Install exact locked monorepo dependencies
 npm ci
-```
 
-### Configuration
-
-Copy the example environment file and adjust as needed:
-
-```bash
+# Configure environment variables
 cp .env.example .env
-```
 
-```env
-# Database
-MONGODB_URI=mongodb://127.0.0.1:27017/secure_chat
-
-# Authentication
-JWT_SECRET=replace-with-a-long-random-secret-at-least-32-characters
-
-# CORS
-CLIENT_ORIGIN=http://localhost:5173
-
-# Server
-PORT=4000
-
-# Media upload limits
-MAX_IMAGE_SIZE_BYTES=10485760      # 10 MB
-MAX_VIDEO_SIZE_BYTES=104857600     # 100 MB
-MEDIA_STORAGE_DIR=storage/media
-```
-
-### Running
-
-```bash
-# Start both server and client in development mode
+# Start backend and web frontend in development mode
 npm run dev
 ```
 
-This launches:
-- **Backend API** → `http://localhost:4000`
-- **Web Client** → `http://localhost:5173`
+- **Backend API**: `http://localhost:4000`
+- **Web Client**: `http://localhost:5173`
 
-> **Tip:** Open `http://localhost:5173` in two separate browser profiles (or one incognito window) to test real-time two-way messaging.
-
-### Seed Demo Data *(Optional)*
-
+*(Optional) Seed sample conversation data*:
 ```bash
 npm run seed
 ```
 
 ---
 
-## 🧪 Verification
+### 2. Native Android Capture Protection SDK & Demo
+
+#### Prerequisites
+- **Java Development Kit**: JDK 17 (e.g. OpenJDK 17 / Amazon Corretto 17)
+- **Android SDK**: `compileSdk = 34`, `build-tools = 34.0.0`
+- **Android Device / Emulator**: Running Android 8.0 (API 26) or higher (Android 14+ recommended for screenshot detection callback).
+
+#### Build Commands
+Navigate to `apps/android-protection/`:
 
 ```bash
-# Typecheck all packages
+cd apps/android-protection
+
+# Run SDK unit tests
+./gradlew :capture-protection:test
+
+# Build the reusable release Android Archive (AAR)
+./gradlew :capture-protection:assembleRelease
+
+# Build the installable demonstration APK
+./gradlew :protection-demo:assembleDebug
+```
+
+*Windows equivalents*:
+```cmd
+gradlew.bat :capture-protection:test
+gradlew.bat :capture-protection:assembleRelease
+gradlew.bat :protection-demo:assembleDebug
+```
+
+#### Build Output Artifacts
+- **Release AAR**: `apps/android-protection/capture-protection/build/outputs/aar/capture-protection-release.aar`
+- **Debug APK**: `apps/android-protection/protection-demo/build/outputs/apk/debug/protection-demo-debug.apk`
+
+---
+
+## 📲 Physical Device Verification Protocol
+
+To verify capture protection on a physical Android device:
+
+```bash
+# Install the debug demo APK via ADB
+adb install -r apps/android-protection/protection-demo/build/outputs/apk/debug/protection-demo-debug.apk
+```
+
+| Step | Screen | Test Action | Expected Result |
+|---|---|---|---|
+| **1** | **Normal Viewer** | Press `Power + Volume Down` | Screenshot captures the sensitive document normally (baseline). |
+| **2** | **Protected Viewer** | Press `Power + Volume Down` | System displays *"Can't take screenshot due to security policy"* or writes solid black file. |
+| **3** | **Protected Viewer** | Start system screen recording | Recorded video displays solid black rectangle over the protected window. |
+| **4** | **Protected Viewer** | Open Android Recents / App Switcher | App thumbnail card is blanked out in the task overview. |
+| **5** | **Screenshot Detection** | Press `Power + Volume Down` | Callback fires, counter increments, and in-app toast notification appears (Android 14+ only; shows unsupported notice on < API 34). |
+| **6** | **Capture Testing Lab** | Complete manual checklist | Record `PASS`/`FAIL` verdicts, add observation notes, and tap *"Copy Markdown QA Report"* to export verification logs. |
+
+---
+
+## 📦 Integrating the SDK into Another Android App
+
+1. Copy `capture-protection-release.aar` into your application's `libs/` folder.
+2. Add dependencies to your `build.gradle.kts`:
+   ```kotlin
+   dependencies {
+       implementation(files("libs/capture-protection-release.aar"))
+       implementation("androidx.core:core-ktx:1.13.1")
+       implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.8.3")
+   }
+   ```
+3. Use the SDK in your Activity:
+   ```kotlin
+   class SecureViewerActivity : ComponentActivity() {
+       private val windowController by lazy { SecureWindowController(this) }
+
+       override fun onCreate(savedInstanceState: Bundle?) {
+           super.onCreate(savedInstanceState)
+           
+           // Acquire protection BEFORE setting visual content
+           windowController.acquireProtection("media_viewer")
+           windowController.attachLifecycle(this)
+
+           setContent {
+               // Render protected media
+           }
+       }
+   }
+   ```
+
+---
+
+## 🧪 Automated Testing & Verification Suite
+
+```bash
+# 1. Typecheck all web and server packages
 npm run typecheck
 
-# Production build
+# 2. Build production web and server bundles
 npm run build
 
-# End-to-end integration tests (requires running MongoDB)
+# 3. Run backend end-to-end integration tests (requires MongoDB)
 npm run test:e2e
 
-# Fail-closed JWT revocation failure checks
+# 4. Verify fail-closed JWT token revocation
 npm run test:auth-revocation
 
-# Real-browser image/video playback, emoji, and deletion tests (requires MongoDB and both dev servers)
+# 5. Run real-browser Playwright media and emoji tests
 npm run test:browser
 
-# Dependency security audit
+# 6. Audit web dependencies
 npm audit --audit-level=moderate
+
+# 7. Run Android SDK unit tests (JUnit + Mockito)
+cd apps/android-protection && ./gradlew :capture-protection:test
 ```
 
-The integration suite covers authentication, messaging, media authorization/upload/streaming, deletion, and Unicode persistence. The Playwright suite opens two independent browser sessions to exercise media rendering and playback plus the message composer. See [PROJECT_STATUS.md](docs/PROJECT_STATUS.md) for executed results and remaining verification gaps.
+---
+
+## 🛡️ Security Model & Platform Boundaries
+
+| Security Layer | Enforced Protection | Technical Boundaries |
+|---|---|---|
+| **Window Surface Security** | `FLAG_SECURE` blocks software screenshots, screen recording, and task-switcher previews. | Applies at window level; cannot selectively protect an individual element inside an unprotected window. |
+| **Screenshot Detection** | Native Android 14 `ScreenCaptureCallback` notifies application of captures. | Detection only; does not prevent screenshots. Suppressed by Android when `FLAG_SECURE` is active. Does not detect ADB captures. |
+| **Transport & Auth** | Argon2id, HTTP-only secure cookies, and persistent fail-closed JWT revocation. | Server-side deletion cannot un-see or erase copies previously saved by recipients. |
+| **Media Delivery** | Opaque keys, magic-byte inspection, EXIF stripping, and `Cache-Control: private, no-store`. | Filesystem storage is single-host; multi-node deployments require cloud object stores. |
+| **The Analog Hole** | **Phase 4 Research Goal (Optical Anti-Capture)** | **No OS flag can stop a physical camera from photographing the screen.** Phase 4 will introduce spatial/temporal pattern modulation to degrade external camera captures. |
 
 ---
 
-## 📡 API Reference
+## 🗺️ Master Multi-Phase Roadmap
 
-### REST Endpoints
+| Phase | Title | Status | Scope |
+|---|---|---|---|
+| **Phase 1** | Core Messaging | ✅ **Completed** | Full auth, durable revocation, MongoDB persistence, Socket.IO text messaging |
+| **Phase 2** | Media Messaging & Viewer | ✅ **Completed** | Private disk storage, range streaming, custom viewer, soft deletion, emoji picker |
+| **Phase 3** | Android Capture Protection SDK | ✅ **Completed** | Reusable `capture-protection` AAR, Compose `protection-demo` APK, physical QA lab |
+| **Phase 4** | Optical Anti-Capture Prototype | 🔬 Planned | Software-based spatial/temporal modulation against external camera photography |
+| **Phase 5** | Native Android Protection Engine | 🔲 Planned | OpenGL ES / Vulkan / NDK real-time rendering engine |
+| **Phase 6** | Native Protected Messenger | 🔲 Planned | Integration of messaging client with native protection SDK |
+| **Phase 7** | View-Once & Ephemeral Media | 🔲 Planned | Expiring media attachments with server-side auto-purge |
+| **Phase 8** | Adaptive Protection | 🔲 Planned | Dynamic parameter tuning based on ambient light and display properties |
+| **Phase 9** | ML Optimization & Benchmarking | 🔲 Planned | Machine learning assisted anti-capture parameter optimization |
 
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| `POST` | `/api/auth/register` | Create a new account |
-| `POST` | `/api/auth/login` | Authenticate and receive session cookie |
-| `POST` | `/api/auth/logout` | Invalidate session |
-| `GET` | `/api/me` | Get authenticated user profile |
-| `GET` | `/api/users?q=...` | Search users by name/username (emails hidden) |
-| `GET` | `/api/conversations` | List conversations with last-message preview |
-| `POST` | `/api/conversations` | Create or retrieve a conversation |
-| `GET` | `/api/conversations/:id/messages` | Fetch message history (text & media) |
-| `DELETE` | `/api/messages/:messageId` | Hide with `{ "scope": "me" }` or sender-only tombstone with `{ "scope": "everyone" }` |
-| `POST` | `/api/conversations/:id/media` | Upload media attachment (multipart) |
-| `GET` | `/api/media/:mediaId` | Retrieve media file (auth required) |
-| `GET` | `/api/conversations/:id/media/:mediaId` | Retrieve media with conversation-scoped auth |
-
-### Socket.IO Events
-
-| Direction | Event | Payload |
-|-----------|-------|---------|
-| Client → Server | `conversation:join` | `conversationId` |
-| Client → Server | `message:send` | `{ conversationId, text }` |
-| Client → Server | `messages:read` | `conversationId` |
-| Client → Server | `typing` | `{ conversationId, isTyping }` |
-| Server → Client | `message:deleted` | Authenticated deletion notification; emitted to the affected user(s) |
-| Server → Client | `message:new` | `MessageDto` (text or media) |
-| Server → Client | `messages:read` | `{ conversationId }` |
-| Server → Client | `typing:update` | `{ conversationId, userId, isTyping }` |
-| Server → Client | `presence:update` | `{ userId, online, lastSeen? }` |
-
----
-
-## 🛡️ Security Model
-
-| Layer | Protection |
-|-------|------------|
-| **Authentication** | Argon2id password hashing, HTTP-only cookies, persisted JWT revocation; revocation-store errors fail closed |
-| **Authorization** | Conversation participant verification on every request |
-| **File Validation** | Magic-byte signature inspection rejects spoofed files (HTML-as-JPEG, SVGs, executables) |
-| **Metadata Privacy** | EXIF/GPS tags stripped from images on upload |
-| **Storage Isolation** | Media stored outside web root with server-generated opaque keys |
-| **Response Hardening** | `CSP: default-src 'none'`, `X-Content-Type-Options: nosniff`, sensitive-media `Cache-Control: private, no-store` |
-| **Upload Safety** | Multer 2.5.0, bounded temporary disk storage, multipart limits and per-IP upload rate limits |
-| **Deletion** | Soft-delete tombstones persist for both participants; previously downloaded or captured copies cannot be erased by the server |
-| **Rate Limiting** | Configurable per-IP request throttling |
-| **Input Validation** | Zod schemas enforce strict type/size/format constraints on all inputs |
-
----
-
-## 🗺️ Roadmap
-
-| Phase | Status | Focus |
-|-------|--------|-------|
-| **Phase 1** | ✅ Complete | Core auth, real-time text messaging, presence, conversation isolation |
-| **Phase 2** | 🧪 Final verification | Secure media, message deletion, emoji insertion, and browser playback validation |
-| **Phase 3** | 🔲 Planned | View-once media, message expiration timers, server-side asset purging |
-| **Phase 4** | 🔲 Planned | Optical anti-capture rendering, screenshot/recording protections |
-| **Phase 5** | 🔲 Planned | Native Android client (Kotlin + Jetpack Compose) with protection SDK |
-
-> See [PROJECT_VISION.md](docs/PROJECT_VISION.md) for the full roadmap and research notes.
-
----
-
-## 🤝 Contributing
-
-Contributions are welcome! Please read our [Contributing Guide](CONTRIBUTING.md) and [Code of Conduct](CODE_OF_CONDUCT.md) before submitting a pull request.
-
-```bash
-# Quick verification before submitting a PR
-npm run typecheck && npm run build && npm run test:e2e && npm run test:browser && npm audit
-```
+> Detailed technical specifications are available in [PROJECT_VISION.md](docs/PROJECT_VISION.md) and [PHASE3_ANDROID_PROTECTION.md](docs/PHASE3_ANDROID_PROTECTION.md).
 
 ---
 
