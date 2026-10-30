@@ -50,6 +50,7 @@ export type MessageDto = {
   mediaAssetId?: string;
   media?: MediaAssetDto;
   status: "sent" | "delivered" | "read";
+  deletedForEveryone?: boolean;
   createdAt: string;
 };
 

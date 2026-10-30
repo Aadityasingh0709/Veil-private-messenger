@@ -21,6 +21,8 @@ Private Messenger is designed for sensitive, direct communication — combining 
 ### Core Messaging
 - **Real-time text messaging** — instant delivery via Socket.IO with typing indicators and read receipts
 - **Persistent conversations** — full message history stored in MongoDB with chronological ordering
+- **Message deletion** — hide messages for yourself or let the sender tombstone a message for both participants, synchronized in real time
+- **Emoji picker** — searchable Unicode emoji categories, recent emojis, and cursor-aware insertion into ordinary messages
 - **User presence** — live online/offline status with last-seen timestamps
 - **User discovery** — search by name or username without exposing email addresses
 
@@ -34,10 +36,10 @@ Private Messenger is designed for sensitive, direct communication — combining 
 - **Custom media viewer** — in-app fullscreen modal with image scaling, video playback controls, and keyboard navigation
 
 ### Authentication & Security
-- **Session-based auth** — JWT tokens in HTTP-only cookies with Argon2 password hashing
+- **Session-based auth** — JWT tokens in HTTP-only cookies with durable revocation, fail-closed revocation checks, and Argon2 password hashing
 - **Rate limiting** — configurable request throttling via `express-rate-limit`
 - **Conversation isolation** — strict participant verification on every message and media request
-- **Safe response headers** — `Content-Security-Policy: default-src 'none'`, `X-Content-Type-Options: nosniff`
+- **Private media** — authorization on every fetch, `Cache-Control: private, no-store`, strict content headers, bounded disk uploads, and signature checks
 
 ---
 
@@ -52,11 +54,12 @@ private-messenger/
 │   │       ├── routes.ts         # REST API routes & media streaming
 │   │       ├── socket.ts         # Socket.IO event handlers
 │   │       ├── models.ts         # Mongoose schemas (User, Conversation, Message, MediaAsset)
-│   │       ├── middleware.ts      # Auth middleware & rate limiting
+│   │       ├── auth.ts            # JWT validation, revocation, and auth middleware
 │   │       ├── storage.ts        # Storage adapter for media persistence
 │   │       ├── serializers.ts    # DTO serializers for API responses
 │   │       ├── seed.ts           # Demo data seeder
-│   │       └── e2e-test.ts       # Automated end-to-end test suite
+│   │       ├── e2e-test.ts       # API integration, authorization, deletion, and emoji tests
+│   │       └── browser-e2e.ts    # Playwright image, video, emoji, and deletion tests
 │   └── web/             # React + Vite frontend SPA
 │       └── src/
 │           ├── App.tsx           # Main app shell with routing
@@ -66,7 +69,7 @@ private-messenger/
 │               ├── AuthForm.tsx        # Login / Registration
 │               ├── ChatList.tsx        # Conversation sidebar
 │               ├── MessageBubble.tsx   # Text & media message rendering
-│               ├── MessageComposer.tsx # Text input & media upload
+│               ├── MessageComposer.tsx # Text, emoji picker & media upload
 │               ├── MediaViewer.tsx     # Fullscreen media viewer modal
 │               ├── UserSearch.tsx      # User discovery search
 │               ├── Navigation.tsx      # Sidebar navigation
@@ -98,7 +101,7 @@ The project uses an **npm workspaces** monorepo with three packages:
 
 | Requirement | Version |
 |-------------|---------|
-| [Node.js](https://nodejs.org/) | 20+ |
+| [Node.js](https://nodejs.org/) | 24 LTS |
 | [MongoDB](https://www.mongodb.com/try/download/community) | 6+ (running locally) |
 
 ### Installation
@@ -108,8 +111,8 @@ The project uses an **npm workspaces** monorepo with three packages:
 git clone https://github.com/Aadityasingh0709/private-messenger.git
 cd private-messenger
 
-# Install all workspace dependencies
-npm install
+# Install the exact locked workspace dependencies
+npm ci
 ```
 
 ### Configuration
@@ -171,9 +174,18 @@ npm run build
 
 # End-to-end integration tests (requires running MongoDB)
 npm run test:e2e
+
+# Fail-closed JWT revocation failure checks
+npm run test:auth-revocation
+
+# Real-browser image/video playback, emoji, and deletion tests (requires MongoDB and both dev servers)
+npm run test:browser
+
+# Dependency security audit
+npm audit --audit-level=moderate
 ```
 
-The automated E2E suite runs **27 verification checks** covering authentication, real-time messaging, media upload/streaming, security hardening, and input validation — all with a 100% pass rate. See [PROJECT_STATUS.md](docs/PROJECT_STATUS.md) for the full test matrix.
+The integration suite covers authentication, messaging, media authorization/upload/streaming, deletion, and Unicode persistence. The Playwright suite opens two independent browser sessions to exercise media rendering and playback plus the message composer. See [PROJECT_STATUS.md](docs/PROJECT_STATUS.md) for executed results and remaining verification gaps.
 
 ---
 
@@ -191,6 +203,7 @@ The automated E2E suite runs **27 verification checks** covering authentication,
 | `GET` | `/api/conversations` | List conversations with last-message preview |
 | `POST` | `/api/conversations` | Create or retrieve a conversation |
 | `GET` | `/api/conversations/:id/messages` | Fetch message history (text & media) |
+| `DELETE` | `/api/messages/:messageId` | Hide with `{ "scope": "me" }` or sender-only tombstone with `{ "scope": "everyone" }` |
 | `POST` | `/api/conversations/:id/media` | Upload media attachment (multipart) |
 | `GET` | `/api/media/:mediaId` | Retrieve media file (auth required) |
 | `GET` | `/api/conversations/:id/media/:mediaId` | Retrieve media with conversation-scoped auth |
@@ -203,6 +216,7 @@ The automated E2E suite runs **27 verification checks** covering authentication,
 | Client → Server | `message:send` | `{ conversationId, text }` |
 | Client → Server | `messages:read` | `conversationId` |
 | Client → Server | `typing` | `{ conversationId, isTyping }` |
+| Server → Client | `message:deleted` | Authenticated deletion notification; emitted to the affected user(s) |
 | Server → Client | `message:new` | `MessageDto` (text or media) |
 | Server → Client | `messages:read` | `{ conversationId }` |
 | Server → Client | `typing:update` | `{ conversationId, userId, isTyping }` |
@@ -214,12 +228,14 @@ The automated E2E suite runs **27 verification checks** covering authentication,
 
 | Layer | Protection |
 |-------|------------|
-| **Authentication** | Argon2id password hashing, JWT in HTTP-only cookies |
+| **Authentication** | Argon2id password hashing, HTTP-only cookies, persisted JWT revocation; revocation-store errors fail closed |
 | **Authorization** | Conversation participant verification on every request |
 | **File Validation** | Magic-byte signature inspection rejects spoofed files (HTML-as-JPEG, SVGs, executables) |
 | **Metadata Privacy** | EXIF/GPS tags stripped from images on upload |
 | **Storage Isolation** | Media stored outside web root with server-generated opaque keys |
-| **Response Hardening** | `CSP: default-src 'none'`, `X-Content-Type-Options: nosniff`, `Cache-Control: private` |
+| **Response Hardening** | `CSP: default-src 'none'`, `X-Content-Type-Options: nosniff`, sensitive-media `Cache-Control: private, no-store` |
+| **Upload Safety** | Multer 2.5.0, bounded temporary disk storage, multipart limits and per-IP upload rate limits |
+| **Deletion** | Soft-delete tombstones persist for both participants; previously downloaded or captured copies cannot be erased by the server |
 | **Rate Limiting** | Configurable per-IP request throttling |
 | **Input Validation** | Zod schemas enforce strict type/size/format constraints on all inputs |
 
@@ -230,7 +246,7 @@ The automated E2E suite runs **27 verification checks** covering authentication,
 | Phase | Status | Focus |
 |-------|--------|-------|
 | **Phase 1** | ✅ Complete | Core auth, real-time text messaging, presence, conversation isolation |
-| **Phase 2** | ✅ Complete | Secure media upload/streaming, EXIF stripping, custom media viewer |
+| **Phase 2** | 🧪 Final verification | Secure media, message deletion, emoji insertion, and browser playback validation |
 | **Phase 3** | 🔲 Planned | View-once media, message expiration timers, server-side asset purging |
 | **Phase 4** | 🔲 Planned | Optical anti-capture rendering, screenshot/recording protections |
 | **Phase 5** | 🔲 Planned | Native Android client (Kotlin + Jetpack Compose) with protection SDK |
@@ -245,7 +261,7 @@ Contributions are welcome! Please read our [Contributing Guide](CONTRIBUTING.md)
 
 ```bash
 # Quick verification before submitting a PR
-npm run typecheck && npm run build && npm run test:e2e
+npm run typecheck && npm run build && npm run test:e2e && npm run test:browser && npm audit
 ```
 
 ---

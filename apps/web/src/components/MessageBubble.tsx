@@ -6,6 +6,7 @@ interface MessageBubbleProps {
   message: MessageDto;
   isMine: boolean;
   onOpenMedia?: (url: string, type: "image" | "video", title?: string) => void;
+  onDelete: (messageId: string, scope: "me" | "everyone") => Promise<void>;
 }
 
 function formatMessageTime(dateStr: string): string {
@@ -21,15 +22,24 @@ function formatFileSize(bytes?: number): string {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
-export function MessageBubble({ message, isMine, onOpenMedia }: MessageBubbleProps) {
+export function MessageBubble({ message, isMine, onOpenMedia, onDelete }: MessageBubbleProps) {
   const time = formatMessageTime(message.createdAt);
   const mediaId = message.mediaAssetId || message.media?.id;
   const mediaUrl = mediaId ? api.getMediaUrl(mediaId, message.conversationId) : "";
   const [imageLoaded, setImageLoaded] = useState(false);
   const [mediaError, setMediaError] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
 
   const isImage = message.type === "image" && Boolean(mediaUrl);
   const isVideo = message.type === "video" && Boolean(mediaUrl);
+
+  const deleteMessage = async (scope: "me" | "everyone") => {
+    if (scope === "everyone" && !window.confirm("Delete this message for everyone? Recipients may already have saved a copy.")) {
+      return;
+    }
+    setMenuOpen(false);
+    await onDelete(message.id, scope);
+  };
 
   const handleMediaClick = () => {
     if (!mediaUrl || mediaError) return;
@@ -43,6 +53,32 @@ export function MessageBubble({ message, isMine, onOpenMedia }: MessageBubblePro
   return (
     <div className={`message-row ${isMine ? "row-mine" : "row-theirs"}`}>
       <div className={`message-bubble ${isMine ? "bubble-mine" : "bubble-theirs"} ${isImage || isVideo ? "bubble-media" : ""}`}>
+        {!message.deletedForEveryone && (
+          <div className="message-actions">
+            <button
+              type="button"
+              className="message-actions-trigger"
+              aria-label="Message actions"
+              aria-haspopup="menu"
+              aria-expanded={menuOpen}
+              onClick={() => setMenuOpen((open) => !open)}
+            >
+              ⋯
+            </button>
+            {menuOpen && (
+              <div className="message-actions-menu" role="menu" aria-label="Message actions">
+                <button type="button" role="menuitem" onClick={() => void deleteMessage("me")}>Delete for me</button>
+                {isMine && (
+                  <button type="button" role="menuitem" onClick={() => void deleteMessage("everyone")}>Delete for everyone</button>
+                )}
+              </div>
+            )}
+          </div>
+        )}
+        {message.deletedForEveryone ? (
+          <div className="bubble-deleted" aria-label="Message deleted">This message was deleted.</div>
+        ) : (
+          <>
         {isImage && (
           <div className="bubble-media-wrapper" onClick={handleMediaClick} role="button" tabIndex={0} onKeyDown={(e) => e.key === "Enter" && handleMediaClick()}>
             {!imageLoaded && !mediaError && (
@@ -100,10 +136,12 @@ export function MessageBubble({ message, isMine, onOpenMedia }: MessageBubblePro
         {message.text && (
           <div className="bubble-text">{message.text}</div>
         )}
+          </>
+        )}
 
         <div className="bubble-meta">
           <span className="bubble-time">{time}</span>
-          {isMine && (
+          {isMine && !message.deletedForEveryone && (
             <span className={`bubble-status status-${message.status}`} title={`Status: ${message.status}`}>
               {message.status === "read" && "✓✓"}
               {message.status === "delivered" && "✓✓"}

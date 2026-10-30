@@ -10,7 +10,9 @@
     "build": "npm run build -w @secure-chat/shared && npm run build -w @secure-chat/server && npm run build -w @secure-chat/web",
     "typecheck": "npm run build -w @secure-chat/shared && npm run typecheck -w @secure-chat/server && npm run typecheck -w @secure-chat/web",
     "seed": "tsx apps/server/src/seed.ts",
-    "test:e2e": "tsx apps/server/src/e2e-test.ts"
+    "test:e2e": "tsx apps/server/src/e2e-test.ts",
+    "test:auth-revocation": "tsx apps/server/src/auth-failure-test.ts",
+    "test:browser": "tsx apps/server/src/browser-e2e.ts"
   },
   "devDependencies": {
     "concurrently": "^9.2.4",

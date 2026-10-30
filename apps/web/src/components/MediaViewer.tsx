@@ -45,14 +45,15 @@ export function MediaViewer({
 
   // Pause playback when closed or unmounted
   useEffect(() => {
-    if (!isOpen && videoRef.current) {
-      videoRef.current.pause();
-      videoRef.current.currentTime = 0;
+    const video = videoRef.current;
+    if (!isOpen) {
+      video?.pause();
+      if (video) video.currentTime = 0;
+      return;
     }
     return () => {
-      if (videoRef.current) {
-        videoRef.current.pause();
-      }
+      video?.pause();
+      if (video) video.currentTime = 0;
     };
   }, [isOpen]);
 

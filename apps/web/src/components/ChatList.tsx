@@ -21,7 +21,9 @@ function formatChatTime(dateStr?: string): string {
 
 function formatSnippet(lastMsg: MessageDto, currentUserId: string): string {
   let content = "";
-  if (lastMsg.type === "image") {
+  if (lastMsg.deletedForEveryone) {
+    content = "This message was deleted.";
+  } else if (lastMsg.type === "image") {
     content = lastMsg.text ? `📷 ${lastMsg.text}` : "📷 Photo";
   } else if (lastMsg.type === "video") {
     content = lastMsg.text ? `🎥 ${lastMsg.text}` : "🎥 Video";

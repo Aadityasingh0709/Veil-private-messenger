@@ -97,6 +97,27 @@ function ChatApp() {
       }
     });
 
+    socket.on("message:deleted", (payload: {
+      messageId: string;
+      conversationId: string;
+      scope: "me" | "everyone";
+      userId?: string;
+    }) => {
+      if (payload.scope === "me" && payload.userId !== me.id) return;
+      if (payload.scope === "me") {
+        setMessages((prev) => prev.filter((message) => message.id !== payload.messageId));
+      } else {
+        setMessages((prev) => prev.map((message) =>
+          message.id === payload.messageId
+            ? { ...message, text: "", mediaAssetId: undefined, media: undefined, deletedForEveryone: true }
+            : message
+        ));
+      }
+      void api.conversations().then((result) => setConversations(result.conversations)).catch((err) => {
+        setError(err instanceof Error ? err.message : "Could not refresh conversations after message deletion");
+      });
+    });
+
     // Realtime read receipts
     socket.on("messages:read", ({ conversationId }: { conversationId: string }) => {
       if (selectedConversationIdRef.current === conversationId) {
@@ -177,6 +198,22 @@ function ChatApp() {
     setViewerType(type);
     setViewerTitle(title ?? (type === "image" ? "Photo" : "Video"));
     setViewerOpen(true);
+  };
+
+  const handleDeleteMessage = async (messageId: string, scope: "me" | "everyone") => {
+    if (!selected) return;
+    try {
+      const { message } = await api.deleteMessage(messageId, scope);
+      if (scope === "me") {
+        setMessages((prev) => prev.filter((item) => item.id !== messageId));
+      } else {
+        if (message) setMessages((prev) => prev.map((item) => item.id === messageId ? message : item));
+      }
+      const result = await api.conversations();
+      setConversations(result.conversations);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not delete message");
+    }
   };
 
   const handleLogout = async () => {
@@ -264,6 +301,7 @@ function ChatApp() {
                     message={m}
                     isMine={m.senderId === me.id}
                     onOpenMedia={handleOpenMedia}
+                    onDelete={handleDeleteMessage}
                   />
                 ))
               )}

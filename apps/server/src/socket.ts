@@ -61,13 +61,19 @@ export const configureSockets = (io: Server) => {
     socket.join(`user:${userId}`);
 
     // Verify session has not been revoked on every incoming packet
-    socket.use(async (_packet, next) => {
-      if (await isTokenRevoked(jti)) {
-        socket.emit("session:revoked", { error: "Session has been logged out" });
+    socket.use((_packet, next) => {
+      void isTokenRevoked(jti).then((revoked) => {
+        if (revoked) {
+          socket.emit("session:revoked", { error: "Session has been logged out" });
+          socket.disconnect(true);
+          next(new Error("Unauthorized: session revoked"));
+          return;
+        }
+        next();
+      }).catch(() => {
         socket.disconnect(true);
-        return next(new Error("Unauthorized: session revoked"));
-      }
-      next();
+        next(new Error("Unauthorized: session verification unavailable"));
+      });
     });
 
     // Update presence to online

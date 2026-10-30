@@ -1,6 +1,7 @@
 import { io } from "socket.io-client";
 import fs from "node:fs";
 import path from "node:path";
+import { config } from "./config.js";
 
 const API = process.env.API_URL ?? "http://localhost:4000";
 
@@ -201,7 +202,7 @@ async function runTest() {
 
   // User search isolation
   console.log("7. Testing User Search Isolation...");
-  const resSearch = await fetch(`${API}/api/users?q=${encodeURIComponent("bob")}`, {
+  const resSearch = await fetch(`${API}/api/users?q=${encodeURIComponent(`bob_${timestamp}`)}`, {
     headers: { Cookie: cookieAlice }
   });
   const { users } = await resSearch.json();
@@ -297,6 +298,33 @@ async function runTest() {
   }
   console.log("✓ Bob received Alice's text message in real time:", receivedTextMsg.text);
 
+  const emojiText = "Hello 😀🌍🚀";
+  const emojiMessagePromise = new Promise<any>((resolve) => {
+    socketBob.once("message:new", (msg) => {
+      if (msg.text === emojiText) resolve(msg);
+    });
+  });
+  const emojiAck: any = await new Promise((resolve) => {
+    socketAlice.emit("message:send", { conversationId: conversation.id, text: emojiText }, resolve);
+  });
+  const receivedEmoji = await emojiMessagePromise;
+  if (emojiAck.message?.text !== emojiText || receivedEmoji.text !== emojiText) {
+    throw new Error("Unicode emoji message was not preserved through Socket.IO");
+  }
+  const emojiOnly = "😀";
+  const emojiOnlyPromise = new Promise<any>((resolve) => {
+    socketBob.once("message:new", (msg) => {
+      if (msg.text === emojiOnly) resolve(msg);
+    });
+  });
+  const emojiOnlyAck: any = await new Promise((resolve) => {
+    socketAlice.emit("message:send", { conversationId: conversation.id, text: emojiOnly }, resolve);
+  });
+  if (emojiOnlyAck.message?.text !== emojiOnly || (await emojiOnlyPromise).text !== emojiOnly) {
+    throw new Error("Emoji-only message was not preserved through Socket.IO");
+  }
+  console.log("✓ Unicode emoji text was persisted and delivered without modification");
+
   // -------------------------------------------------------------
   // 4. PHASE 2 MEDIA UPLOADS & VALIDATION
   // -------------------------------------------------------------
@@ -326,6 +354,11 @@ async function runTest() {
   console.log("✓ PNG image uploaded & received in real time:", pngMsg.id);
 
   console.log("12. Phase 2: Uploading JPEG Image with EXIF Metadata...");
+  const mediaStorageDirs = [...new Set([
+    config.mediaStorageDir,
+    path.resolve(process.cwd(), "apps/server/storage/media")
+  ])].filter((dir) => fs.existsSync(dir));
+  const filesBeforeJpeg = new Map(mediaStorageDirs.map((dir) => [dir, new Set(fs.readdirSync(dir))]));
   const formJpeg = new FormData();
   formJpeg.append("file", new Blob([VALID_JPEG_WITH_EXIF], { type: "image/jpeg" }), "photo_with_exif.jpg");
   formJpeg.append("caption", "JPEG with EXIF metadata");
@@ -337,6 +370,15 @@ async function runTest() {
   });
   if (!resJpeg.ok) throw new Error(`JPEG upload failed: ${await resJpeg.text()}`);
   const { message: jpegMsg } = await resJpeg.json();
+  const jpegStorageFiles = mediaStorageDirs.flatMap((dir) =>
+    fs.readdirSync(dir)
+      .filter((name) => !filesBeforeJpeg.get(dir)?.has(name))
+      .map((name) => path.join(dir, name))
+  );
+  if (jpegStorageFiles.length !== 1) {
+    throw new Error(`Expected one newly stored JPEG object, found ${jpegStorageFiles.length}`);
+  }
+  const jpegStoragePath = jpegStorageFiles[0];
   console.log("✓ JPEG uploaded successfully:", jpegMsg.id);
 
   // Verify EXIF was stripped by fetching stored content
@@ -661,14 +703,17 @@ async function runTest() {
   });
   const { messages: history } = await resMessages.json();
   console.log("✓ Retrieved", history.length, "persisted messages from database");
-  if (history.length !== 6) {
-    throw new Error(`Expected 6 messages in history, got ${history.length}`);
+  if (history.length !== 8) {
+    throw new Error(`Expected 8 messages in history, got ${history.length}`);
   }
   const types = history.map((m: any) => m.type);
-  if (types[0] !== "text" || types[1] !== "image" || types[2] !== "image" || types[3] !== "image" || types[4] !== "video" || types[5] !== "video") {
+  if (types[0] !== "text" || types[1] !== "text" || types[2] !== "text" || types[3] !== "image" || types[4] !== "image" || types[5] !== "image" || types[6] !== "video" || types[7] !== "video") {
     throw new Error(`Unexpected message type sequence: ${types.join(", ")}`);
   }
-  console.log("✓ Chronological order and message types verified (text, image, image, image, video, video)");
+  if (!history.some((m: any) => m.text === emojiText) || !history.some((m: any) => m.text === emojiOnly)) {
+    throw new Error("Unicode emoji messages did not persist unchanged in message history");
+  }
+  console.log("✓ Chronological ordering, Unicode and emoji-only persistence, and message types verified");
 
   console.log("35. UI Preview: Verifying Conversation List Snippet...");
   const resConversations = await fetch(`${API}/api/conversations`, {
@@ -682,18 +727,137 @@ async function runTest() {
   }
   console.log("✓ Conversation list correctly reflects latest media message (type: video)");
 
+  console.log("36. Deletion: Bob deletes Alice's WebP message for himself...");
+  const hideWebp = await fetch(`${API}/api/messages/${webpMsg.id}`, {
+    method: "DELETE",
+    headers: { "Content-Type": "application/json", Cookie: cookieBob },
+    body: JSON.stringify({ scope: "me" })
+  });
+  if (hideWebp.status !== 200 || !(await hideWebp.json()).deleted) {
+    throw new Error(`Delete for me failed: ${hideWebp.status}`);
+  }
+  const bobAfterHide = await fetch(`${API}/api/conversations/${conversation.id}/messages`, { headers: { Cookie: cookieBob } }).then((r) => r.json());
+  const aliceAfterHide = await fetch(`${API}/api/conversations/${conversation.id}/messages`, { headers: { Cookie: cookieAlice } }).then((r) => r.json());
+  if (bobAfterHide.messages.some((m: any) => m.id === webpMsg.id) || !aliceAfterHide.messages.some((m: any) => m.id === webpMsg.id)) {
+    throw new Error("Delete for me did not persist for only the requesting user");
+  }
+  console.log("✓ Delete for me persists for Bob while Alice retains the original message");
+
+  console.log("37. Media: Per-user deletion blocks only the requester's media access...");
+  const bobHiddenMedia = await fetch(`${API}/api/media/${webpMsg.mediaAssetId}`, { headers: { Cookie: cookieBob } });
+  const aliceVisibleMedia = await fetch(`${API}/api/media/${webpMsg.mediaAssetId}`, { headers: { Cookie: cookieAlice } });
+  if (bobHiddenMedia.status !== 404 || aliceVisibleMedia.status !== 200) {
+    throw new Error(`Expected hidden media 404 for Bob and 200 for Alice; got ${bobHiddenMedia.status}/${aliceVisibleMedia.status}`);
+  }
+  console.log("✓ Hidden media is inaccessible to Bob and remains available to Alice");
+
+  console.log("38. Deletion: A recipient cannot delete the sender's message for everyone...");
+  const unauthorizedDelete = await fetch(`${API}/api/messages/${receivedTextMsg.id}`, {
+    method: "DELETE",
+    headers: { "Content-Type": "application/json", Cookie: cookieBob },
+    body: JSON.stringify({ scope: "everyone" })
+  });
+  if (unauthorizedDelete.status !== 403) {
+    throw new Error(`Expected 403 for unauthorized delete-for-everyone, got ${unauthorizedDelete.status}`);
+  }
+  console.log("✓ Non-sender delete-for-everyone request rejected");
+
+  console.log("39. Deletion: Sender deletes a media message for everyone...");
+  const mediaDeletionEvent = new Promise<any>((resolve) => {
+    socketBob.once("message:deleted", (payload) => {
+      if (payload.messageId === jpegMsg.id && payload.scope === "everyone") resolve(payload);
+    });
+  });
+  const deleteJpeg = await fetch(`${API}/api/messages/${jpegMsg.id}`, {
+    method: "DELETE",
+    headers: { "Content-Type": "application/json", Cookie: cookieAlice },
+    body: JSON.stringify({ scope: "everyone" })
+  });
+  if (!deleteJpeg.ok) throw new Error(`Delete-for-everyone failed: ${deleteJpeg.status}`);
+  const mediaDeletionNotice = await mediaDeletionEvent;
+  if (mediaDeletionNotice.messageId !== jpegMsg.id) throw new Error("Recipient did not receive deletion event");
+  console.log("✓ Deleted media tombstone synchronized to recipient over Socket.IO");
+
+  console.log("40. Security: Globally deleted media cannot be retrieved by either participant...");
+  const aliceDeletedMedia = await fetch(`${API}/api/media/${jpegMsg.mediaAssetId}`, { headers: { Cookie: cookieAlice } });
+  const bobDeletedMedia = await fetch(`${API}/api/media/${jpegMsg.mediaAssetId}`, { headers: { Cookie: cookieBob } });
+  if (aliceDeletedMedia.status !== 404 || bobDeletedMedia.status !== 404) {
+    throw new Error(`Expected deleted media 404 for both participants, got ${aliceDeletedMedia.status}/${bobDeletedMedia.status}`);
+  }
+  if (fs.existsSync(jpegStoragePath)) {
+    throw new Error("Deleted media object remains in private storage");
+  }
+  console.log("✓ Globally deleted media is no longer retrievable through protected media routes");
+
+  console.log("41. Persistence: Both users retain the media deletion tombstone...");
+  const aliceAfterGlobalDelete = await fetch(`${API}/api/conversations/${conversation.id}/messages`, { headers: { Cookie: cookieAlice } }).then((r) => r.json());
+  const bobAfterGlobalDelete = await fetch(`${API}/api/conversations/${conversation.id}/messages`, { headers: { Cookie: cookieBob } }).then((r) => r.json());
+  for (const result of [aliceAfterGlobalDelete, bobAfterGlobalDelete]) {
+    const tombstone = result.messages.find((m: any) => m.id === jpegMsg.id);
+    if (!tombstone?.deletedForEveryone || tombstone.text || tombstone.mediaAssetId) {
+      throw new Error("Deleted media tombstone did not persist without exposing content");
+    }
+  }
+  console.log("✓ Refresh-equivalent history reads return the persisted redacted tombstone");
+
+  console.log("42. Conversations: Delete-for-me updates the requester's last-message preview...");
+  const hideEmoji = await fetch(`${API}/api/messages/${receivedEmoji.id}`, {
+    method: "DELETE",
+    headers: { "Content-Type": "application/json", Cookie: cookieBob },
+    body: JSON.stringify({ scope: "me" })
+  });
+  if (!hideEmoji.ok) throw new Error(`Could not hide latest message: ${hideEmoji.status}`);
+  const bobConversationsAfterHide = await fetch(`${API}/api/conversations`, { headers: { Cookie: cookieBob } }).then((r) => r.json());
+  const bobConversationAfterHide = bobConversationsAfterHide.conversations.find((c: any) => c.id === conversation.id);
+  if (bobConversationAfterHide?.lastMessage?.id !== webmMsg.id) {
+    throw new Error("Conversation preview did not fall back to Bob's latest visible message");
+  }
+  console.log("✓ Conversation list falls back to the latest message visible to Bob");
+
+  console.log("43. Deletion: Sender deletes a text message for everyone...");
+  const textDeletionEvent = new Promise<any>((resolve) => {
+    socketBob.once("message:deleted", (payload) => {
+      if (payload.messageId === receivedTextMsg.id && payload.scope === "everyone") resolve(payload);
+    });
+  });
+  const deleteText = await fetch(`${API}/api/messages/${receivedTextMsg.id}`, {
+    method: "DELETE",
+    headers: { "Content-Type": "application/json", Cookie: cookieAlice },
+    body: JSON.stringify({ scope: "everyone" })
+  });
+  if (!deleteText.ok) throw new Error(`Text delete-for-everyone failed: ${deleteText.status}`);
+  await textDeletionEvent;
+  console.log("✓ Sender can tombstone a text message and recipient receives its deletion event");
+
+  console.log("44. Persistence: Text deletion survives a history reload...");
+  const bobHistoryAfterTextDelete = await fetch(`${API}/api/conversations/${conversation.id}/messages`, { headers: { Cookie: cookieBob } }).then((r) => r.json());
+  const textTombstone = bobHistoryAfterTextDelete.messages.find((m: any) => m.id === receivedTextMsg.id);
+  if (!textTombstone?.deletedForEveryone || textTombstone.text) {
+    throw new Error("Text deletion did not persist as a redacted tombstone");
+  }
+  console.log("✓ Reloaded recipient history retains the deleted-text placeholder state");
+
   // -------------------------------------------------------------
   // 9. LOGOUT & SESSION REVOCATION (PRIORITY FOUR)
   // -------------------------------------------------------------
-  console.log("36. Auth: Testing Logout and Immediate Session Revocation...");
+  console.log("45. Auth: Testing Logout and Immediate Session Revocation...");
+  const loggedOutSocketDisconnect = new Promise<void>((resolve, reject) => {
+    const timeout = setTimeout(() => reject(new Error("Socket session was not disconnected after logout")), 3000);
+    socketBob.once("disconnect", () => {
+      clearTimeout(timeout);
+      resolve();
+    });
+  });
   const resLogout = await fetch(`${API}/api/auth/logout`, {
     method: "POST",
     headers: { Cookie: cookieBob }
   });
   if (resLogout.status !== 204) throw new Error(`Logout failed: ${resLogout.status}`);
+  await loggedOutSocketDisconnect;
+  if (socketBob.connected) throw new Error("Logged-out socket remained connected");
   console.log("✓ Logout succeeded with status 204");
 
-  console.log("37. Auth: Protected Request with Revoked Cookie Rejected...");
+  console.log("46. Auth: Protected Request with Revoked Cookie Rejected...");
   const resRevokedCookie = await fetch(`${API}/api/me`, {
     headers: { Cookie: cookieBob }
   });
@@ -703,7 +867,7 @@ async function runTest() {
     throw new Error(`Expected status 401 for revoked session cookie, got ${resRevokedCookie.status}`);
   }
 
-  console.log("38. Auth: Protected Request with Revoked Bearer Token Rejected...");
+  console.log("47. Auth: Protected Request with Revoked Bearer Token Rejected...");
   const resRevokedBearer = await fetch(`${API}/api/me`, {
     headers: { Authorization: `Bearer ${tokenBob}` }
   });
@@ -713,7 +877,7 @@ async function runTest() {
     throw new Error(`Expected status 401 for revoked Bearer token, got ${resRevokedBearer.status}`);
   }
 
-  console.log("39. Auth: Socket.IO Reconnection with Revoked Token Rejected...");
+  console.log("48. Auth: Socket.IO Reconnection with Revoked Token Rejected...");
   const socketRevoked = io(API, {
     auth: { token: tokenBob },
     transports: ["websocket"],
@@ -730,7 +894,7 @@ async function runTest() {
     throw new Error(`Expected socket connection rejection, got: ${revokedSocketError}`);
   }
 
-  console.log("40. Auth: Independent Session Isolation Verified...");
+  console.log("49. Auth: Independent Session Isolation Verified...");
   const resAliceStillValid = await fetch(`${API}/api/me`, {
     headers: { Cookie: cookieAlice }
   });
@@ -743,7 +907,7 @@ async function runTest() {
   // -------------------------------------------------------------
   // 10. HELMET HTTP SECURITY HEADERS & HEALTH
   // -------------------------------------------------------------
-  console.log("41. Security: Helmet HTTP Security Headers Present...");
+  console.log("50. Security: Helmet HTTP Security Headers Present...");
   const resHelmet = await fetch(`${API}/api/me`, {
     headers: { Cookie: cookieAlice }
   });
@@ -765,7 +929,7 @@ async function runTest() {
   }
   console.log("✓ Helmet HTTP security headers verified (nosniff, X-Frame-Options, CORP: same-origin, no X-Powered-By)");
 
-  console.log("42. Health: Server Health Endpoint (/health)...");
+  console.log("51. Health: Server Health Endpoint (/health)...");
   const resHealth = await fetch(`${API}/health`);
   if (resHealth.status !== 200) throw new Error(`Health check failed: ${resHealth.status}`);
   const healthData = await resHealth.json();
@@ -779,7 +943,7 @@ async function runTest() {
   socketRevoked.disconnect();
 
   console.log("\n===============================================================");
-  console.log("🎉 ALL 42 VERIFICATION CHECKS (PHASE 1 & PHASE 2) PASSED 100%!");
+  console.log("🎉 ALL 51 VERIFICATION CHECKS (PHASE 1 & PHASE 2) PASSED 100%!");
   console.log("===============================================================");
 }
 

@@ -78,6 +78,7 @@ export const api = {
   conversations: () => request<{ conversations: ConversationDto[] }>("/conversations"),
   createConversation: (userId: string) => request<{ conversation: ConversationDto }>("/conversations", { method: "POST", body: JSON.stringify({ userId }) }),
   messages: (id: string) => request<{ messages: MessageDto[] }>(`/conversations/${id}/messages`),
+  deleteMessage: (messageId: string, scope: "me" | "everyone") => request<{ message?: MessageDto; deleted?: boolean }>(`/messages/${messageId}`, { method: "DELETE", body: JSON.stringify({ scope }) }),
   uploadMedia,
   getMediaUrl
 };

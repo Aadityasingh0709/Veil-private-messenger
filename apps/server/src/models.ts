@@ -24,7 +24,10 @@ const messageSchema = new Schema({
   text: { type: String, trim: true, maxlength: 4000, default: "" },
   type: { type: String, enum: ["text", "image", "video"], default: "text" },
   mediaAssetId: { type: Schema.Types.ObjectId, ref: "MediaAsset" },
-  status: { type: String, enum: ["sent", "delivered", "read"], default: "sent" }
+  status: { type: String, enum: ["sent", "delivered", "read"], default: "sent" },
+  deletedFor: { type: [{ type: Schema.Types.ObjectId, ref: "User" }], default: [] },
+  deletedForEveryone: { type: Boolean, default: false },
+  deletedAt: Date
 }, { timestamps: true });
 messageSchema.index({ conversationId: 1, createdAt: -1 });
 
@@ -50,4 +53,3 @@ const revokedTokenSchema = new Schema({
 revokedTokenSchema.index({ expiresAt: 1 }, { expireAfterSeconds: 0 });
 
 export const RevokedToken = model("RevokedToken", revokedTokenSchema);
-

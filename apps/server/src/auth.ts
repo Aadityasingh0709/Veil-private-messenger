@@ -16,6 +16,13 @@ export interface TokenPayload {
 // In-memory set for low-latency revocation checks
 const revokedJtiCache = new Set<string>();
 
+export class RevocationStoreUnavailableError extends Error {
+  constructor() {
+    super("Token revocation store is unavailable");
+    this.name = "RevocationStoreUnavailableError";
+  }
+}
+
 export const signToken = (userId: string) => {
   const jti = crypto.randomUUID();
   return jwt.sign({ sub: userId, jti }, config.jwtSecret, { expiresIn: "7d" });
@@ -31,28 +38,34 @@ export const isTokenRevoked = async (jti?: string): Promise<boolean> => {
       return true;
     }
   } catch {
-    // If database check fails, fallback to cache
+    throw new RevocationStoreUnavailableError();
   }
   return false;
 };
 
 export const revokeToken = async (token: string): Promise<{ revoked: boolean; jti?: string; userId?: string }> => {
   try {
-    const decoded = jwt.decode(token) as TokenPayload | null;
-    if (!decoded) return { revoked: false };
+    const decoded = jwt.verify(token, config.jwtSecret) as TokenPayload;
+    if (!decoded.sub || !decoded.exp) return { revoked: false };
     const jti = decoded.jti || crypto.createHash("sha256").update(token).digest("hex");
+    const expiresAt = new Date(decoded.exp * 1000);
+    try {
+      await RevokedToken.create({ jti, userId: decoded.sub, expiresAt });
+    } catch (error) {
+      if (!(typeof error === "object" && error !== null && "code" in error && error.code === 11000)) {
+        throw error;
+      }
+    }
     revokedJtiCache.add(jti);
-    const expiresAt = decoded.exp ? new Date(decoded.exp * 1000) : new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
-    await RevokedToken.create({
-      jti,
-      userId: decoded.sub,
-      expiresAt
-    }).catch((err: any) => {
-      if (err.code !== 11000) console.error("Error storing revoked token:", err.message);
-    });
     return { revoked: true, jti, userId: decoded.sub };
-  } catch {
-    return { revoked: false };
+  } catch (error) {
+    if (error instanceof jwt.JsonWebTokenError || error instanceof jwt.NotBeforeError) {
+      return { revoked: false };
+    }
+    if (error instanceof jwt.TokenExpiredError) {
+      return { revoked: false };
+    }
+    throw new RevocationStoreUnavailableError();
   }
 };
 
@@ -83,7 +96,10 @@ export const requireAuth = async (req: AuthRequest, res: Response, next: NextFun
     req.userId = userId;
     req.tokenJti = jti;
     next();
-  } catch {
+  } catch (error) {
+    if (error instanceof RevocationStoreUnavailableError) {
+      return res.status(503).json({ error: "Authentication service temporarily unavailable" });
+    }
     res.status(401).json({ error: "Invalid or expired session" });
   }
 };

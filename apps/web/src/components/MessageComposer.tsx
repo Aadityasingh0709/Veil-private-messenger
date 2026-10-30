@@ -1,5 +1,6 @@
-import { useState, useRef, type FormEvent, type KeyboardEvent, type ChangeEvent } from "react";
+import { useState, useRef, useEffect, type FormEvent, type KeyboardEvent, type ChangeEvent } from "react";
 import type { Socket } from "socket.io-client";
+import EmojiPickerLibrary from "emoji-picker-react";
 import { ALLOWED_IMAGE_MIME_TYPES, ALLOWED_VIDEO_MIME_TYPES } from "@secure-chat/shared";
 import { api } from "../api";
 import { ErrorBanner } from "./States";
@@ -22,7 +23,30 @@ export function MessageComposer({ conversationId, socket, onSent }: MessageCompo
   const [error, setError] = useState("");
 
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const messageInputRef = useRef<HTMLInputElement>(null);
+  const emojiPickerRef = useRef<HTMLDivElement>(null);
+  const selectionRangeRef = useRef({ start: 0, end: 0 });
   const typingTimer = useRef<number>();
+  const [emojiPickerOpen, setEmojiPickerOpen] = useState(false);
+
+  useEffect(() => {
+    if (!emojiPickerOpen) return;
+    const handlePointerDown = (event: PointerEvent) => {
+      if (!(event.target instanceof Node)) return;
+      if (emojiPickerRef.current?.contains(event.target)) return;
+      if (event.target instanceof Element && event.target.closest(".btn-emoji")) return;
+      setEmojiPickerOpen(false);
+    };
+    const handleKeyDown = (event: globalThis.KeyboardEvent) => {
+      if (event.key === "Escape") setEmojiPickerOpen(false);
+    };
+    document.addEventListener("pointerdown", handlePointerDown);
+    document.addEventListener("keydown", handleKeyDown);
+    return () => {
+      document.removeEventListener("pointerdown", handlePointerDown);
+      document.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [emojiPickerOpen]);
 
   const emitTyping = (isTyping: boolean) => {
     socket?.emit("typing", { conversationId, isTyping });
@@ -126,8 +150,38 @@ export function MessageComposer({ conversationId, socket, onSent }: MessageCompo
     }
   };
 
+  const handleEmojiSelect = (emoji: string) => {
+    const input = messageInputRef.current;
+    const start = Math.min(selectionRangeRef.current.start, text.length);
+    const end = Math.min(selectionRangeRef.current.end, text.length);
+    const nextText = `${text.slice(0, start)}${emoji}${text.slice(end)}`;
+    handleChange(nextText);
+    selectionRangeRef.current = { start: start + emoji.length, end: start + emoji.length };
+    window.requestAnimationFrame(() => {
+      input?.focus();
+      input?.setSelectionRange(start + emoji.length, start + emoji.length);
+    });
+  };
+
   return (
     <div className="composer-wrapper">
+      {emojiPickerOpen && (
+        <div className="emoji-picker-popover" ref={emojiPickerRef}>
+          <EmojiPickerLibrary
+            open
+            onEmojiClick={(selection) => {
+              handleEmojiSelect(selection.emoji);
+              setEmojiPickerOpen(false);
+            }}
+            height={360}
+            width="min(340px, calc(100vw - 24px))"
+            lazyLoadEmojis
+            searchLabel="Search emojis"
+            searchPlaceHolder="Search emojis"
+            aria-label="Emoji picker"
+          />
+        </div>
+      )}
       {uploading && (
         <div className="upload-progress-banner">
           <div className="upload-progress-info">
@@ -160,13 +214,44 @@ export function MessageComposer({ conversationId, socket, onSent }: MessageCompo
           📎
         </button>
 
+        <button
+          type="button"
+          className="btn-emoji"
+          onClick={() => setEmojiPickerOpen((open) => !open)}
+          disabled={uploading || sending}
+          title={emojiPickerOpen ? "Close emoji picker" : "Open emoji picker"}
+          aria-label={emojiPickerOpen ? "Close emoji picker" : "Open emoji picker"}
+          aria-expanded={emojiPickerOpen}
+        >
+          {emojiPickerOpen ? "×" : "☺"}
+        </button>
+
         <input
           type="text"
+          ref={messageInputRef}
           className="composer-input"
           placeholder={uploading ? "Uploading media…" : "Type a message…"}
           value={text}
           disabled={sending || uploading}
-          onChange={(e) => handleChange(e.target.value)}
+          onChange={(e) => {
+            handleChange(e.target.value);
+            selectionRangeRef.current = {
+              start: e.target.selectionStart ?? e.target.value.length,
+              end: e.target.selectionEnd ?? e.target.value.length
+            };
+          }}
+          onSelect={(e) => {
+            selectionRangeRef.current = {
+              start: e.currentTarget.selectionStart ?? e.currentTarget.value.length,
+              end: e.currentTarget.selectionEnd ?? e.currentTarget.value.length
+            };
+          }}
+          onBlur={(e) => {
+            selectionRangeRef.current = {
+              start: e.currentTarget.selectionStart ?? e.currentTarget.value.length,
+              end: e.currentTarget.selectionEnd ?? e.currentTarget.value.length
+            };
+          }}
           onKeyDown={handleKeyDown}
           maxLength={4000}
         />

@@ -8,8 +8,9 @@ on:
 
 jobs:
   validate:
-    name: Build, Typecheck & E2E Test
+    name: Build, Integration & Browser Tests
     runs-on: ubuntu-latest
+    timeout-minutes: 25
 
     services:
       mongodb:
@@ -29,11 +30,11 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 24
           cache: "npm"
 
       - name: Install dependencies
-        run: npm install
+        run: npm ci
 
       - name: Typecheck all workspaces
         run: npm run typecheck
@@ -41,20 +42,51 @@ jobs:
       - name: Build production bundles
         run: npm run build
 
-      - name: Start server in background for E2E validation
+      - name: Install Playwright browser
+        run: npx playwright install --with-deps chromium
+
+      - name: Start application services
         env:
           PORT: 4000
           MONGODB_URI: mongodb://127.0.0.1:27017/secure_chat_ci
           JWT_SECRET: ci-test-secret-key-at-least-32-chars-long-123456
           CLIENT_ORIGIN: http://localhost:5173
         run: |
-          npx tsx apps/server/src/index.ts &
-          sleep 4
+          npx tsx apps/server/src/index.ts > server.log 2>&1 &
+          npm run dev -w @secure-chat/web -- --host 127.0.0.1 > web.log 2>&1 &
+          for attempt in {1..30}; do
+            if curl --fail --silent http://127.0.0.1:4000/health > /dev/null && curl --fail --silent http://127.0.0.1:5173/ > /dev/null; then
+              exit 0
+            fi
+            sleep 1
+          done
+          cat server.log
+          cat web.log
+          exit 1
 
-      - name: Run End-to-End integration tests
+      - name: Run integration and authorization tests
         env:
           PORT: 4000
           MONGODB_URI: mongodb://127.0.0.1:27017/secure_chat_ci
           JWT_SECRET: ci-test-secret-key-at-least-32-chars-long-123456
           CLIENT_ORIGIN: http://localhost:5173
         run: npm run test:e2e
+
+      - name: Test fail-closed token revocation failures
+        env:
+          MONGODB_URI: mongodb://127.0.0.1:27017/secure_chat_ci
+          JWT_SECRET: ci-test-secret-key-at-least-32-chars-long-123456
+        run: npm run test:auth-revocation
+
+      - name: Run real-browser image, video, emoji and deletion tests
+        env:
+          PORT: 4000
+          MONGODB_URI: mongodb://127.0.0.1:27017/secure_chat_ci
+          JWT_SECRET: ci-test-secret-key-at-least-32-chars-long-123456
+          CLIENT_ORIGIN: http://localhost:5173
+          CLIENT_URL: http://localhost:5173
+          API_URL: http://localhost:4000
+        run: npm run test:browser
+
+      - name: Audit dependencies
+        run: npm audit --audit-level=moderate

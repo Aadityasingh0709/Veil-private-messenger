@@ -161,14 +161,30 @@ authRouter.post("/login", async (req, res, next) => {
 // Logout user, revoke JWT session token, disconnect session sockets and clear session cookie
 authRouter.post("/logout", async (req, res, next) => {
   try {
+    const cookieToken = req.cookies?.token;
     const token = extractToken(req);
     if (token) {
-      const { jti } = await revokeToken(token);
-      if (jti) {
-        await disconnectSessionSockets(jti);
+      let result: Awaited<ReturnType<typeof revokeToken>>;
+      try {
+        result = await revokeToken(token);
+      } catch (error) {
+        console.error("Logout could not persist token revocation:", error);
+        return res.status(503).json({ error: "Logout could not be completed. Please try again." });
+      }
+      if (!result.revoked) {
+        if (cookieToken === token) {
+          res.clearCookie("token", { path: "/", sameSite: "lax", secure: config.isProduction });
+        }
+        return res.status(204).send();
+      }
+      if (result.jti) {
+        await disconnectSessionSockets(result.jti);
+      }
+      if (cookieToken === token) {
+        res.clearCookie("token", { path: "/", sameSite: "lax", secure: config.isProduction });
       }
     }
-    res.clearCookie("token", { path: "/" }).status(204).send();
+    res.status(204).send();
   } catch (err) {
     next(err);
   }
@@ -223,7 +239,26 @@ apiRouter.get("/conversations", async (req: AuthRequest, res, next) => {
       })
       .sort({ lastMessageAt: -1, updatedAt: -1 });
 
-    res.json({ conversations: items.map(conversationDto) });
+    const conversations = await Promise.all(items.map(async (item) => {
+      const lastMessage = item.lastMessage as any;
+      const isHiddenForUser = !lastMessage?.deletedForEveryone
+        && lastMessage?.deletedFor?.some((userId: Types.ObjectId) => String(userId) === req.userId);
+      if (!isHiddenForUser) return conversationDto(item);
+
+      const visibleMessage = await Message.findOne({
+        conversationId: item._id,
+        deletedForEveryone: { $ne: true },
+        deletedFor: { $ne: req.userId }
+      }).populate("mediaAsset").sort({ createdAt: -1, _id: -1 });
+      const dto = conversationDto(item);
+      dto.lastMessage = visibleMessage ? messageDto(visibleMessage) : undefined;
+      dto.lastMessageAt = visibleMessage?.createdAt ? new Date(visibleMessage.createdAt).toISOString() : undefined;
+      return dto;
+    }));
+    conversations.sort((a, b) =>
+      (b.lastMessageAt ?? b.updatedAt).localeCompare(a.lastMessageAt ?? a.updatedAt)
+    );
+    res.json({ conversations });
   } catch (err) {
     next(err);
   }
@@ -294,7 +329,10 @@ apiRouter.get("/conversations/:id/messages", async (req: AuthRequest, res, next)
       return res.status(404).json({ error: "Conversation not found or access denied" });
     }
 
-    const messages = await Message.find({ conversationId: conversation._id })
+    const messages = await Message.find({
+      conversationId: conversation._id,
+      deletedFor: { $ne: req.userId }
+    })
       .populate("mediaAsset")
       .sort({ createdAt: -1, _id: -1 })
       .limit(200);
@@ -307,6 +345,81 @@ apiRouter.get("/conversations/:id/messages", async (req: AuthRequest, res, next)
     );
 
     res.json({ messages: messages.map((m) => messageDto(m)) });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// Delete policy: users may hide any message from their own view; only its sender
+// may tombstone it for everyone, with no time limit.
+apiRouter.delete("/messages/:messageId", async (req: AuthRequest, res, next) => {
+  try {
+    const messageId = String(req.params.messageId);
+    const scope = req.body?.scope;
+    if (!Types.ObjectId.isValid(messageId) || (scope !== "me" && scope !== "everyone")) {
+      return res.status(400).json({ error: "Invalid message deletion request" });
+    }
+
+    const message = await Message.findById(messageId);
+    if (!message) return res.status(404).json({ error: "Message not found" });
+    const conversation = await ownConversation(String(message.conversationId), req.userId!);
+    if (!conversation) return res.status(404).json({ error: "Message not found" });
+
+    if (scope === "everyone" && String(message.senderId) !== req.userId) {
+      return res.status(403).json({ error: "Only the sender can delete a message for everyone" });
+    }
+
+    let updated = message;
+    if (scope === "everyone" && !message.deletedForEveryone) {
+      updated = (await Message.findOneAndUpdate(
+        { _id: message._id, deletedForEveryone: { $ne: true } },
+        { $set: { deletedForEveryone: true, deletedAt: new Date(), text: "" } },
+        { new: true }
+      )) ?? message;
+    } else if (scope === "me" && !message.deletedForEveryone) {
+      updated = (await Message.findOneAndUpdate(
+        { _id: message._id, deletedForEveryone: { $ne: true } },
+        { $addToSet: { deletedFor: req.userId } },
+        { new: true }
+      )) ?? message;
+    }
+
+    const io = getIO();
+    if (io) {
+      if (scope === "me") {
+        io.to(`user:${req.userId}`).emit("message:deleted", {
+          messageId: String(message._id),
+          conversationId: String(message.conversationId),
+          scope: "me",
+          userId: req.userId
+        });
+      } else {
+        for (const participant of conversation.participants) {
+          io.to(`user:${participant}`).emit("message:deleted", {
+            messageId: String(message._id),
+            conversationId: String(message.conversationId),
+            scope: "everyone"
+          });
+        }
+      }
+    }
+
+    if (scope === "everyone" && message.mediaAssetId) {
+      const activeReference = await Message.exists({
+        mediaAssetId: message.mediaAssetId,
+        deletedForEveryone: { $ne: true }
+      });
+      if (!activeReference) {
+        const asset = await MediaAsset.findById(message.mediaAssetId).select("+storageKey");
+        if (asset) {
+          await storage.delete(asset.storageKey);
+          await asset.deleteOne();
+        }
+      }
+    }
+
+    if (scope === "me") return res.json({ deleted: true });
+    res.json({ message: messageDto(updated) });
   } catch (err) {
     next(err);
   }
@@ -467,6 +580,15 @@ const serveMedia = async (
 
   const asset = await MediaAsset.findById(mediaId).select("+storageKey");
   if (!asset) {
+    return res.status(404).json({ error: "Media not found" });
+  }
+
+  const visibleMessageExists = await Message.exists({
+    mediaAssetId: asset._id,
+    deletedForEveryone: { $ne: true },
+    deletedFor: { $ne: userId }
+  });
+  if (!visibleMessageExists) {
     return res.status(404).json({ error: "Media not found" });
   }
 

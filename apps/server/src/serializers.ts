@@ -31,15 +31,17 @@ export const mediaAssetDto = (asset: any): MediaAssetDto => ({
 export const messageDto = (m: any): MessageDto => {
   const type: MessageType = (m.type === "image" || m.type === "video") ? m.type : "text";
   const mediaObj = m.mediaAsset || (m.mediaAssetId && typeof m.mediaAssetId === "object" ? m.mediaAssetId : undefined);
+  const deletedForEveryone = Boolean(m.deletedForEveryone);
   return {
     id: String(m._id),
     conversationId: String(m.conversationId),
     senderId: String(m.senderId),
-    text: m.text ?? "",
+    text: deletedForEveryone ? "" : m.text ?? "",
     type,
-    ...(m.mediaAssetId ? { mediaAssetId: String(m.mediaAssetId._id ?? m.mediaAssetId) } : {}),
-    ...(mediaObj ? { media: mediaAssetDto(mediaObj) } : {}),
+    ...(!deletedForEveryone && m.mediaAssetId ? { mediaAssetId: String(m.mediaAssetId._id ?? m.mediaAssetId) } : {}),
+    ...(!deletedForEveryone && mediaObj ? { media: mediaAssetDto(mediaObj) } : {}),
     status: m.status,
+    ...(deletedForEveryone ? { deletedForEveryone: true } : {}),
     createdAt: new Date(m.createdAt).toISOString()
   };
 };

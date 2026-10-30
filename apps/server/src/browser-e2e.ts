@@ -7,7 +7,7 @@ const API_URL = process.env.API_URL ?? "http://localhost:4000";
 
 const FIXTURES_DIR = path.resolve(process.cwd(), "test-fixtures");
 const SAMPLE_PNG = path.join(FIXTURES_DIR, "sample.png");
-const SAMPLE_MP4 = path.join(FIXTURES_DIR, "sample.mp4");
+const SAMPLE_WEBM = path.join(FIXTURES_DIR, "sample.webm");
 
 async function wait(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -45,8 +45,8 @@ async function runBrowserTests() {
   if (!fs.existsSync(SAMPLE_PNG)) {
     throw new Error(`Sample PNG fixture not found at: ${SAMPLE_PNG}`);
   }
-  if (!fs.existsSync(SAMPLE_MP4)) {
-    throw new Error(`Sample MP4 fixture not found at: ${SAMPLE_MP4}`);
+  if (!fs.existsSync(SAMPLE_WEBM)) {
+    throw new Error(`Sample WebM fixture not found at: ${SAMPLE_WEBM}`);
   }
 
   const browser: Browser = await chromium.launch({
@@ -114,10 +114,56 @@ async function runBrowserTests() {
     await pageA.locator(".bubble-text", { hasText: replyText }).waitFor({ timeout: 8000 });
     console.log("✓ Alice received Bob's reply in real-time");
 
+    console.log("\n4. [Browser Test E] Testing emoji selection and message deletion...");
+    const composerInput = pageA.locator(".composer-input");
+    await composerInput.fill("Keep this text");
+    await composerInput.evaluate((input: HTMLInputElement) => input.setSelectionRange(5, 5));
+    await pageA.locator(".btn-emoji").click();
+    const emojiSearch = pageA.getByRole("textbox", { name: "Search emojis" });
+    await emojiSearch.fill("grinning face");
+    const emojiResult = pageA.locator('.EmojiPickerReact button[aria-label="grinning face"]').first();
+    await emojiResult.waitFor({ state: "visible", timeout: 5000 });
+    await emojiResult.click();
+    const insertedText = await composerInput.inputValue();
+    const insertedCaret = await composerInput.evaluate((input: HTMLInputElement) => input.selectionStart);
+    if (insertedText !== "Keep 😀this text" || insertedCaret !== 7) {
+      throw new Error(`Emoji insertion did not preserve the unsent text or cursor position (got "${insertedText}")`);
+    }
+    await pageA.locator(".btn-emoji").click();
+    await pageA.getByRole("textbox", { name: "Search emojis" }).fill("");
+    await pageA.locator('.EmojiPickerReact button[aria-label="Flags"]').click();
+    await pageA.locator('.EmojiPickerReact button[aria-label*="flag"]').first().waitFor({ state: "visible", timeout: 5000 });
+    await pageA.locator(".btn-emoji").click();
+    await pageA.locator(".composer-send-btn").click();
+    await pageB.locator(".bubble-text", { hasText: "Keep 😀this text" }).waitFor({ timeout: 8000 });
+    await composerInput.fill("😀");
+    await pageA.locator(".composer-send-btn").click();
+    await pageB.locator(".bubble-text", { hasText: /^😀$/ }).waitFor({ timeout: 8000 });
+    console.log("✓ Emoji search, category navigation, text-preserving insertion, send and realtime delivery work");
+
+    const replyRowA = pageA.locator(".message-row").filter({ hasText: replyText });
+    await replyRowA.getByRole("button", { name: "Message actions" }).click();
+    await pageA.getByRole("menuitem", { name: "Delete for me" }).click();
+    await replyRowA.waitFor({ state: "detached", timeout: 5000 });
+    await pageB.locator(".bubble-text", { hasText: replyText }).waitFor({ state: "visible", timeout: 3000 });
+    console.log("✓ Delete for me removes the message only from the requesting browser");
+
+    const originalRowA = pageA.locator(".message-row").filter({ hasText: testMessageText });
+    pageA.once("dialog", (dialog) => dialog.accept());
+    await originalRowA.getByRole("button", { name: "Message actions" }).click();
+    await pageA.getByRole("menuitem", { name: "Delete for everyone" }).click();
+    await pageA.locator(".bubble-deleted", { hasText: "This message was deleted." }).waitFor({ state: "visible", timeout: 5000 });
+    await pageB.locator(".bubble-deleted", { hasText: "This message was deleted." }).waitFor({ state: "visible", timeout: 5000 });
+    await pageB.reload();
+    await pageB.waitForSelector(".sidebar", { timeout: 10000 });
+    await startConversationWith(pageB, aliceUsername);
+    await pageB.locator(".bubble-deleted").waitFor({ state: "visible", timeout: 10000 });
+    console.log("✓ Delete for everyone synchronizes to both browsers and persists after refresh");
+
     // -----------------------------------------------------------------------
     // BROWSER TEST A: IMAGE WORKFLOW (UPLOAD, RENDER, CUSTOM VIEWER, PERSIST)
     // -----------------------------------------------------------------------
-    console.log("\n4. [Browser Test A] Testing Image upload & custom viewer workflow...");
+    console.log("\n5. [Browser Test A] Testing Image upload & custom viewer workflow...");
     // Add caption first, then select file
     const imageCaption = "Photo attachment test";
     await composerInputA.fill(imageCaption);
@@ -167,11 +213,11 @@ async function runBrowserTests() {
     // -----------------------------------------------------------------------
     // BROWSER TEST B: VIDEO WORKFLOW (UPLOAD, PLAYBACK, SEEK, CLOSE, PERSIST)
     // -----------------------------------------------------------------------
-    console.log("\n5. [Browser Test B] Testing Video upload & playback workflow...");
+    console.log("\n6. [Browser Test B] Testing Video upload & playback workflow...");
     const fileChooserVideoPromise = pageA.waitForEvent("filechooser");
     await pageA.locator(".btn-attach").click();
     const fileChooserVideo = await fileChooserVideoPromise;
-    await fileChooserVideo.setFiles(SAMPLE_MP4);
+    await fileChooserVideo.setFiles(SAMPLE_WEBM);
 
     // Verify video bubble appears on Bob's side
     const videoBubbleB = pageB.locator(".bubble-video-wrapper").first();
@@ -194,26 +240,45 @@ async function runBrowserTests() {
       });
     });
     console.log("✓ Video metadata loaded successfully (readyState >= 1):", hasMetadata);
+    if (!hasMetadata) throw new Error("Video metadata did not load");
 
     // Verify video playback advances
-    await viewerVideo.evaluate((el: HTMLVideoElement) => el.play());
-    await wait(800);
+    await viewerVideo.evaluate((el: HTMLVideoElement) => {
+      el.muted = true;
+      return el.play();
+    });
+    await pageB.waitForFunction(() => {
+      const video = document.querySelector<HTMLVideoElement>(".media-viewer-video");
+      return Boolean(video && video.currentTime > 0.1 && !video.paused);
+    }, undefined, { timeout: 5000 });
     const currentTime = await viewerVideo.evaluate((el: HTMLVideoElement) => el.currentTime);
     console.log("✓ Video playback started, currentTime:", currentTime.toFixed(2), "s");
-    if (currentTime <= 0) {
-      console.warn("⚠️ Playback did not advance automatically; testing seek directly");
+    if (currentTime <= 0.1) {
+      throw new Error("Video playback did not advance in the browser");
     }
 
     // Verify video seeking
-    const seekTime = await viewerVideo.evaluate((el: HTMLVideoElement) => {
+    await viewerVideo.evaluate((el: HTMLVideoElement) => {
       el.currentTime = 1.0;
-      return el.currentTime;
     });
+    await pageB.waitForFunction(() => {
+      const video = document.querySelector<HTMLVideoElement>(".media-viewer-video");
+      return Boolean(video && !video.seeking && Math.abs(video.currentTime - 1.0) < 0.2);
+    }, undefined, { timeout: 5000 });
+    const seekTime = await viewerVideo.evaluate((el: HTMLVideoElement) => el.currentTime);
     console.log("✓ Video seeking verified, new time:", seekTime.toFixed(2), "s");
+    if (Math.abs(seekTime - 1.0) > 0.2) throw new Error(`Video seek landed at ${seekTime}, expected near 1.0`);
 
     // Close viewer via Escape key
+    await viewerVideo.evaluate((el: HTMLVideoElement) => {
+      (window as Window & { closingVideo?: HTMLVideoElement }).closingVideo = el;
+    });
     await pageB.keyboard.press("Escape");
     await viewerModal.waitFor({ state: "hidden", timeout: 3000 });
+    const pauseOnClose = await pageB.evaluate(() =>
+      (window as Window & { closingVideo?: HTMLVideoElement }).closingVideo?.paused ?? false
+    );
+    if (!pauseOnClose) throw new Error("Closing the viewer did not pause video playback");
     console.log("✓ Video viewer closed via Escape key and video playback halted");
 
     // Refresh and confirm video message persists
@@ -226,7 +291,7 @@ async function runBrowserTests() {
     // -----------------------------------------------------------------------
     // BROWSER TEST C: ERRORS AND EDGE CASES
     // -----------------------------------------------------------------------
-    console.log("\n6. [Browser Test C] Testing UI errors, validations & edge cases...");
+    console.log("\n7. [Browser Test C] Testing UI errors, validations & edge cases...");
 
     // 1. Unsupported format (attempting to upload a .txt file)
     const dummyTxtPath = path.join(FIXTURES_DIR, "invalid.txt");
@@ -249,6 +314,16 @@ async function runBrowserTests() {
     await wait(300);
     const isComposerVisibleMobile = await pageA.locator(".composer-container").isVisible();
     console.log("✓ Mobile viewport (375x667) rendered cleanly, composer visible:", isComposerVisibleMobile);
+    await pageA.locator(".btn-emoji").click();
+    const pickerBox = await pageA.locator(".emoji-picker-popover").boundingBox();
+    if (!pickerBox || pickerBox.x < 0 || pickerBox.x + pickerBox.width > 375) {
+      throw new Error("Emoji picker does not fit within the mobile viewport");
+    }
+    await pageA.locator(".btn-emoji").click();
+    if (await pageA.locator(".emoji-picker-popover").count()) {
+      throw new Error("Emoji picker close action did not dismiss the picker");
+    }
+    console.log("✓ Emoji picker remains within the mobile viewport and its close button works");
 
     // Clean up temporary files
     try {
