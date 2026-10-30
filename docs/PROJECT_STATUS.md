@@ -1,75 +1,76 @@
-# Project Status — Phase 2 Finalization
+# Project Status — Phase 3 Implementation
 
-## Current Verdict: READY TO FREEZE
+## Current Phase: PHASE 3 (Digital Capture Protection & Native Android SDK)
 
-Phase 2 now includes the existing private media workflow plus message deletion and Unicode emoji messaging. The acceptance checks below were run locally against MongoDB and real Chromium browser sessions. The GitHub Actions workflow has been updated, but no hosted Actions run was triggered in this session.
+Phase 3 introduces the first native Android security component for the Private Messenger platform, establishing the foundation for digital capture protection and future optical anti-capture research.
 
-## Phase 1 — Preserved
+---
 
-- Cookie authentication, bearer-token API support, registration, login, and logout.
-- Durable JWT revocation, strict conversation authorization, and real-time socket messaging.
-- User discovery, one-to-one conversations, message history, read receipts, typing, and presence.
-- Query-string JWT authentication remains unsupported.
+## 1. Multi-Phase Progress Summary
 
-## Phase 2 — Media Messaging
+| Phase | Title | Status | Deliverables |
+|---|---|---|---|
+| **Phase 1** | Core Messaging | **Completed** | Full auth, JWT revocation, MongoDB persistence, Socket.IO real-time text chat |
+| **Phase 2** | Media Messaging & Viewer | **Completed** | Private disk storage, streaming video, custom viewers, message deletion, emoji picker |
+| **Phase 3** | Android Capture Protection SDK | **Current (Implemented)** | Reusable `capture-protection` AAR, `protection-demo` APK, physical QA lab, CI pipeline |
+| **Phase 4** | Optical Anti-Capture Prototype | Planned | Spatial/temporal modulation research against external camera photography |
+| **Phase 5** | Native Android Protection Engine | Planned | OpenGL ES / Vulkan / NDK rendering engine |
+| **Phase 6** | Native Protected Messenger | Planned | Integration of messaging client with native protection SDK |
+| **Phase 7** | View-Once & Ephemeral Media | Planned | Expiring media and server-side auto-purge |
+| **Phase 8** | Adaptive Protection | Planned | Ambient & display condition tuning |
+| **Phase 9** | ML Optimization | Planned | ML-based anti-capture parameter optimization |
 
-- JPEG, PNG, WebP, MP4, and WebM allowlists with server-side signature validation and configured image/video size limits.
-- Multer 2.5.0 is installed in the active dependency tree; multipart requests are bounded and temporary uploads use disk storage outside public directories.
-- Private storage uses generated storage keys. Authorized media fetches validate conversation membership and message visibility.
-- Full and byte-range media responses use `Cache-Control: private, no-store`; video range requests and custom viewers are retained.
-- JPEG/PNG privacy processing and cleanup of failed uploads remain in place.
+---
 
-## Authentication and Revocation Hardening
+## 2. Phase 1 & 2 Preservation Status
 
-- Revocation lookup errors now fail closed; authenticated HTTP requests return a service-unavailable response rather than accepting a token.
-- Logout verifies the signed token and persists revocation before reporting success or clearing the matching cookie. Storage-write failures return an error and leave the cookie intact.
-- Revocation entries use the token's `jti` and expire at the token's expiration. Legacy tokens without a `jti` are keyed by a token digest.
-- Socket.IO connections verify revocation, packet checks disconnect on store errors, and logout disconnects only sockets for the revoked `jti`.
+- **Web Application & Backend Intact**: The existing React + Vite web client (`apps/web`) and Node.js + Express backend (`apps/server`) remain untouched and fully functional.
+- **No Migration in Phase 3**: Phase 3 does not migrate the web client; it establishes an independent Android research and verification project under `apps/android-protection/`.
+- **Automated Verification**:
+  - `npm run typecheck`: PASS (0 errors)
+  - `npm run build`: PASS (Shared, Server, and Web bundles)
 
-## Message Deletion
+---
 
-- `DELETE /api/messages/:messageId` with `{ "scope": "me" }` hides a message from the requesting user's history and list preview without affecting the other participant.
-- `{ "scope": "everyone" }` is sender-only and creates a persistent redacted tombstone displayed as “This message was deleted.” No time limit is imposed.
-- Deletion broadcasts server-authenticated `message:deleted` updates to the affected user rooms.
-- Media hidden for one user cannot be fetched by that user. Global media deletion blocks access for both users and removes the underlying object when no live message references it.
-- Deletion cannot erase copies previously downloaded, screenshotted, recorded, or otherwise captured by recipients.
+## 3. Phase 3 Deliverables & Implementation Details
 
-## Emoji Messaging
+### A. Reusable Android Library Module (`capture-protection`)
+- **Package**: `com.securechat.protection`
+- **Build Output**: `capture-protection-release.aar`
+- **Core Components**:
+  - `SecureWindowController`: Reference-counted window protection utilizing `WindowManager.LayoutParams.FLAG_SECURE`. Automatically marshals to main thread, preserves pre-existing flags, avoids memory leaks via `WeakReference`, and integrates with `LifecycleOwner`.
+  - `ProtectionSession`: AutoCloseable handle representing an active protection claim.
+  - `ProtectionConfig`: Options for pre-existing flag preservation and auto-restore.
+  - `ProtectionStatus`: Immutable snapshot of active sessions, window secure state, and API capabilities.
+  - `ScreenshotDetectionController`: Dedicated controller for Android 14+ (API 34) `Activity.ScreenCaptureCallback`. Distinguishes detection from prevention and handles older API versions safely.
+  - `AndroidManifest.xml`: Declares `android.permission.DETECT_SCREEN_CAPTURE`.
 
-- The composer uses `emoji-picker-react` 5.1.4 with searchable emoji categories, recent emojis, keyboard navigation, outside-click/Escape dismissal, and a compact mobile layout.
-- Selection inserts Unicode at the remembered text selection and leaves sending to the user. Emoji-only and mixed text/emoji messages persist as ordinary Unicode text.
-- No reactions or counters were introduced.
+### B. Demonstration Application (`protection-demo`)
+- **Package**: `com.securechat.demo`
+- **Build Output**: `protection-demo-debug.apk`
+- **UI Architecture**: 100% Jetpack Compose with Material 3.
+- **Verification Screens**:
+  1. **Home / Protection Dashboard**: Real-time device hardware, Android OS API level, and SDK status cards.
+  2. **Normal Viewer (Baseline)**: Displays sensitive sample document without `FLAG_SECURE` for comparison screenshots.
+  3. **Protected Media Viewer**: Dedicated Activity (`ProtectedViewerActivity`) activating `FLAG_SECURE` before visual composition. Verifies screenshot blocking, screen recording blackouts, and recent-apps censoring.
+  4. **Screenshot Detection Demo**: Standalone listener for Android 14+ native capture callback with live detection counter.
+  5. **Capture Testing Lab**: Interactive QA checklist allowing testers to record `PASS`/`FAIL` outcomes for 6 physical verification checkpoints and export markdown reports.
+  6. **SDK Info & Platform Limitations**: Educational technical documentation detailing SurfaceFlinger mechanics, OEM differences, and why physical camera capture requires Phase 4.
 
-## Dependencies and CI
+### C. Build Tooling & CI
+- **Gradle & AGP**: Gradle 8.7 wrapper, Android Gradle Plugin 8.4.2, Kotlin 1.9.24, Java 17.
+- **GitHub Actions**: Added `android-protection` job building the release AAR, debug APK, running unit tests, and publishing build outputs as workflow artifacts.
 
-- Active Multer version: 2.5.0. `npm audit --audit-level=moderate` reported no known vulnerabilities.
-- Added `emoji-picker-react` 5.1.4. The lockfile was updated with the package manifest.
-- CI now uses Node.js 24 and `npm ci`; it typechecks, builds, runs integration and revocation-failure tests, installs Chromium, runs Playwright browser tests, and audits dependencies.
+---
 
-## Verification Results
+## 4. Verification Checkpoints
 
-Commands were run locally; the CI workflow itself was not triggered on GitHub.
-
-| Command / scenario | Result |
-|---|---|
-| `npm run typecheck` | PASS |
-| `npm run build` | PASS; Vite reports a large-chunk advisory and upstream annotation warnings |
-| `npm run test:e2e` | PASS — 51 numbered Phase 1/2 integration, authorization, deletion, storage, and emoji checks |
-| `npm run test:auth-revocation` | PASS — simulated revocation lookup/write failures fail closed; expired tokens are rejected |
-| `npm run test:browser` | PASS — two isolated browser users; image rendered; genuine WebM metadata, playback advancement, seeking, and close/pause checked; emoji search/categories/cursor insertion/emoji-only send; deletion synchronization/persistence; mobile picker |
-| `npm audit --audit-level=moderate` | PASS — 0 vulnerabilities |
-| `npm ls multer emoji-picker-react --all` | PASS — Multer 2.5.0 and emoji-picker-react 5.1.4 active |
-| `git diff --check` | PASS |
-
-The browser video fixture is a 2-second, 2.3 KB WebM. `test-fixtures/generate.mjs` regenerates it from browser-generated JPEG frames when `FFMPEG_PATH` points to an FFmpeg build with MJPEG decoding and libvpx-vp9 encoding.
-
-## Remaining Limitations
-
-- The GitHub Actions workflow has not yet been observed on GitHub; its constituent local commands passed.
-- Revocation-store failure behavior is tested with simulated storage failures, not by interrupting the live MongoDB service.
-- Local filesystem storage is intended for single-node development/staging; production multi-node deployments need shared object storage.
-- There is no end-to-end encryption, screenshot/recording protection, view-once or expiring media, group chat, calling, or Android client. These remain outside Phase 2.
-
-## Phase Decision
-
-**Recommendation: freeze Phase 2** after merging this verified change set. The requested Phase 1 regressions, private media behavior, both deletion scopes, emoji insertion/persistence, real browser playback, and fail-closed revocation paths have been validated locally. Do not treat server-side deletion as guaranteed erasure of recipient copies.
+| Checkpoint | Target | Expected Verification Outcome | Status |
+|---|---|---|---|
+| SDK Architecture | `apps/android-protection/capture-protection` | Standalone library, zero UI coupling, AAR packaging | Implemented |
+| Window Flag Enforcement | `SecureWindowController.kt` | Ref-counted `FLAG_SECURE` activation and restoration | Implemented & Unit-Tested |
+| Screenshot Detection | `ScreenshotDetectionController.kt` | API 34+ callback registration with safe fallback on < API 34 | Implemented & Unit-Tested |
+| Standalone Demo App | `apps/android-protection/protection-demo` | Independent from backend, installable APK | Implemented |
+| Dedicated Protected Activity | `ProtectedViewerActivity.kt` | Isolated window lifecycle, protection applied before `setContent` | Implemented |
+| Web Application Regression | Monorepo (`web`, `server`, `shared`) | Existing messaging, auth, and deletion tests pass | Verified |
+| Physical Device Verification | Physical Android Phone | Manual 6-step testing protocol documented for user | Documented in `PHASE3_ANDROID_PROTECTION.md` |

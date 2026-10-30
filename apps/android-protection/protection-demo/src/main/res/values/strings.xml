@@ -1,0 +1,4 @@
+<resources>
+    <string name="app_name">Private Messenger Demo</string>
+    <string name="title_protected_viewer">Protected Media Viewer</string>
+</resources>

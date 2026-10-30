@@ -35,6 +35,14 @@ Private Messenger is designed for sensitive, direct communication — combining 
 - **Byte-range streaming** — HTTP `206 Partial Content` for video seeking and progressive buffering
 - **Custom media viewer** — in-app fullscreen modal with image scaling, video playback controls, and keyboard navigation
 
+### Native Android Capture Protection *(Phase 3)*
+- **Standalone SDK (`capture-protection`)** — reusable Kotlin library (`.aar`) with zero UI coupling
+- **Reference-counted window security** — multi-session `FLAG_SECURE` management via `SecureWindowController`
+- **Pre-existing flag preservation** — protects baseline window flags from premature clearing
+- **Main-thread safe & lifecycle-aware** — automatic dispatch to main looper and cleanup on activity destroy
+- **Screenshot detection (Android 14+)** — native `Activity.ScreenCaptureCallback` integration with safe fallback on older versions
+- **Verification demo app (`protection-demo`)** — 100% Jetpack Compose & Material 3 testbed featuring Normal Viewer baseline, Protected Viewer, Screenshot Detection monitor, and interactive QA testing lab
+
 ### Authentication & Security
 - **Session-based auth** — JWT tokens in HTTP-only cookies with durable revocation, fail-closed revocation checks, and Argon2 password hashing
 - **Rate limiting** — configurable request throttling via `express-rate-limit`
@@ -48,7 +56,10 @@ Private Messenger is designed for sensitive, direct communication — combining 
 ```
 private-messenger/
 ├── apps/
-│   ├── server/          # Express + Socket.IO backend API
+│   ├── android-protection/   # Native Android Capture Protection (Phase 3)
+│   │   ├── capture-protection/ # Reusable Android Library Module (AAR)
+│   │   └── protection-demo/    # Jetpack Compose Demo App (APK)
+│   ├── server/               # Express + Socket.IO backend API
 │   │   └── src/
 │   │       ├── index.ts          # Server entry point
 │   │       ├── routes.ts         # REST API routes & media streaming
@@ -60,7 +71,7 @@ private-messenger/
 │   │       ├── seed.ts           # Demo data seeder
 │   │       ├── e2e-test.ts       # API integration, authorization, deletion, and emoji tests
 │   │       └── browser-e2e.ts    # Playwright image, video, emoji, and deletion tests
-│   └── web/             # React + Vite frontend SPA
+│   └── web/                  # React + Vite frontend SPA
 │       └── src/
 │           ├── App.tsx           # Main app shell with routing
 │           ├── api.ts            # HTTP client wrapper
@@ -77,21 +88,24 @@ private-messenger/
 │               ├── Avatar.tsx          # User avatar with status indicator
 │               └── States.tsx          # Loading, empty, error states
 ├── packages/
-│   └── shared/          # Shared validation schemas & type contracts
+│   └── shared/               # Shared validation schemas & type contracts
 │       └── src/index.ts          # Zod schemas, MIME allowlists, DTO types
 ├── docs/
-│   ├── PROJECT_VISION.md         # Multi-phase roadmap & research notes
-│   └── PROJECT_STATUS.md         # Phase completion audit & test results
-└── package.json         # Workspace root (npm workspaces)
+│   ├── PROJECT_VISION.md              # Multi-phase roadmap & research notes
+│   ├── PROJECT_STATUS.md              # Phase completion audit & test results
+│   └── PHASE3_ANDROID_PROTECTION.md   # Android SDK API & verification guide
+└── package.json              # Workspace root (npm workspaces)
 ```
 
-The project uses an **npm workspaces** monorepo with three packages:
+The monorepo encompasses both web messaging and native mobile security modules:
 
-| Package | Scope | Description |
-|---------|-------|-------------|
+| Module / Package | Scope | Description |
+|------------------|-------|-------------|
 | `@secure-chat/server` | `apps/server` | Express REST API + Socket.IO real-time server |
 | `@secure-chat/web` | `apps/web` | React SPA built with Vite |
 | `@secure-chat/shared` | `packages/shared` | Zod validation schemas, MIME allowlists, and shared TypeScript types |
+| `capture-protection` | `apps/android-protection/capture-protection` | Reusable Kotlin Android Library producing release AAR |
+| `protection-demo` | `apps/android-protection/protection-demo` | Jetpack Compose testbed application producing debug APK |
 
 ---
 
