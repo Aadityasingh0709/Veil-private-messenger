@@ -65,12 +65,42 @@ Phase 3 introduces the first native Android security component for the Private M
 
 ## 4. Verification Checkpoints
 
-| Checkpoint | Target | Expected Verification Outcome | Status |
-|---|---|---|---|
-| SDK Architecture | `apps/android-protection/capture-protection` | Standalone library, zero UI coupling, AAR packaging | Implemented |
-| Window Flag Enforcement | `SecureWindowController.kt` | Ref-counted `FLAG_SECURE` activation and restoration | Implemented & Unit-Tested |
-| Screenshot Detection | `ScreenshotDetectionController.kt` | API 34+ callback registration with safe fallback on < API 34 | Implemented & Unit-Tested |
-| Standalone Demo App | `apps/android-protection/protection-demo` | Independent from backend, installable APK | Implemented |
-| Dedicated Protected Activity | `ProtectedViewerActivity.kt` | Isolated window lifecycle, protection applied before `setContent` | Implemented |
-| Web Application Regression | Monorepo (`web`, `server`, `shared`) | Existing messaging, auth, and deletion tests pass | Verified |
-| Physical Device Verification | Physical Android Phone | Manual 6-step testing protocol documented for user | Documented in `PHASE3_ANDROID_PROTECTION.md` |
+The verification status strictly separates implementation in code, unit test coverage, automated build verification, and physical hardware validation:
+
+| Checkpoint | Target Component | Verification Level | Status | Details / Evidence |
+|---|---|---|---|---|
+| SDK Architecture | `:capture-protection` | Source & Build Verified | **PASSED** | Clean library plugin, no UI dependencies, builds `capture-protection-release.aar` (23,653 bytes) |
+| Window Flag Enforcement | `SecureWindowController.kt` | Unit-Tested & Build Verified | **PASSED** | Ref-counted `FLAG_SECURE`, pre-existing flag preservation, `getInstance` Window singleton |
+| Screenshot Detection | `ScreenshotDetectionController.kt` | Unit-Tested & Build Verified | **PASSED** | API 34+ callback registration, idempotent unregister, status reporting via `ScreenshotDetectionStatus` |
+| Standalone Demo App | `:protection-demo` | Build Verified | **PASSED** | Independent Compose app, builds installable `protection-demo-debug.apk` (15,835,904 bytes) |
+| Dedicated Protected Activity | `ProtectedViewerActivity.kt` | Source & Build Verified | **PASSED** | Window-level protection applied before `setContent`, cleanly restored on finish |
+| Phase 1 & 2 Web Regressions | `web`, `server`, `shared` | Automated Test Verified | **PASSED** | `npm run typecheck` (0 errors), `npm run build` (all 3 workspaces pass) |
+| Android CI Pipeline | `.github/workflows/ci.yml` | CI Automated | **PASSED** | Pre-installed Android SDK licenses accepted, Java 17 configured, AAR/APK published |
+| Physical Hardware Verification | Real Android Phone | Physical Device Testing | **PENDING** | Requires user validation with hardware screenshot/recording buttons. Manual QA sheet provided below. |
+
+---
+
+## 5. Physical Device QA Test Sheet
+
+Physical testing cannot be simulated via ADB or automated unit mocks because Android's `ScreenCaptureCallback` ignores ADB captures, and `FLAG_SECURE` is enforced at the hardware compositor (SurfaceFlinger) level.
+
+Testers must complete this verification log using a physical device:
+
+```markdown
+### Hardware QA Audit Sheet
+- **Device Manufacturer**: ____________________
+- **Device Model**: ____________________
+- **Android OS Version**: ____________________
+- **API Level**: ____________________
+- **Test Date**: ____________________
+- **Tester**: ____________________
+
+| Test Case | Procedure | Expected Physical Behavior | Actual Result (PASS / FAIL) | Notes |
+|---|---|---|---|---|
+| 1. Normal Viewer Baseline | Open Normal Viewer -> Hardware `Power + Vol Down` | Screenshot succeeds; confidential record visible in gallery | [ ] | Baseline verified |
+| 2. Protected Viewer Screenshot | Open Protected Viewer -> Hardware `Power + Vol Down` | OS rejects screenshot with security policy warning, or captures solid black | [ ] | WindowManager FLAG_SECURE |
+| 3. Protected Screen Recording | Start OS screen recorder -> Navigate to Protected Viewer | Recording captures solid black box for the protected activity surface | [ ] | SurfaceFlinger exclusion |
+| 4. Task Switcher Censoring | In Protected Viewer -> Swipe up / tap Recent Apps | App thumbnail in Android task carousel is completely censored/blank | [ ] | Window buffer preview hidden |
+| 5. Screenshot Detection (API 34+) | Open Detection Demo -> Hardware `Power + Vol Down` | Notification / counter increments; detects capture on Android 14+ | [ ] | Suppressed in Protected Viewer |
+| 6. Protection Restoration | Exit Protected Viewer -> Return to Home | Normal screenshot capture restored for standard application windows | [ ] | Reference count zeroed |
+```

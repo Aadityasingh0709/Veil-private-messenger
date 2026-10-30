@@ -86,6 +86,13 @@ class SecureWindowController(
 ) {
     constructor(activity: Activity, config: ProtectionConfig = ProtectionConfig())
 
+    companion object {
+        fun getInstance(window: Window, config: ProtectionConfig = ProtectionConfig()): SecureWindowController
+        fun getInstance(activity: Activity, config: ProtectionConfig = ProtectionConfig()): SecureWindowController
+    }
+
+    var detectionController: ScreenshotDetectionController?
+
     fun acquireProtection(tag: String = "default"): ProtectionSession
     fun releaseProtection(session: ProtectionSession)
     fun releaseAll()
@@ -97,8 +104,10 @@ class SecureWindowController(
 ```
 
 #### Key Capabilities:
+- **Multi-Controller Coordination**: Uses `getInstance()` with a synchronized `WeakHashMap` to guarantee a single canonical controller per Window, preventing reference count collisions between disparate components.
 - **Reference Counting**: Multiple callers (e.g. image viewer, sensitive text bubble) acquire independent sessions. `FLAG_SECURE` remains active on the window as long as `activeSessionsCount > 0`.
-- **Pre-existing State Preservation**: If `FLAG_SECURE` was already present before the SDK was attached, the controller will NOT clear the flag when all SDK sessions are released.
+- **Pre-existing State Preservation**: If `FLAG_SECURE` was already present before the SDK was attached, the controller will NOT clear the flag when all SDK sessions are released (unless configured otherwise).
+- **Screenshot Detection Integration**: Associated `detectionController` allows `getStatus()` to accurately reflect live detection registration and explain OS suppression states without returning fabricated data.
 - **Main-Thread Dispatch**: Mutations to window layout parameters are safely marshaled to `Looper.getMainLooper()`.
 - **Lifecycle Awareness**: Binds to `LifecycleOwner` to guarantee that all sessions release when an Activity is destroyed.
 - **Memory Safety**: Uses `WeakReference<Window>` and `WeakReference<Activity>` to prevent Activity context leaks.
@@ -121,7 +130,7 @@ controller.acquireProtection("media_viewer").use { session ->
 } // Session automatically released here
 ```
 
-### C. `ScreenshotDetectionController`
+### C. `ScreenshotDetectionController` & `ScreenshotDetectionStatus`
 Manages Android 14's native `Activity.registerScreenCaptureCallback`:
 
 ```kotlin
@@ -136,8 +145,16 @@ class ScreenshotDetectionController(
     fun register(): Boolean
     fun unregister()
     fun isRegistered(): Boolean
+    fun getStatus(): ScreenshotDetectionStatus
     fun attachLifecycle(lifecycleOwner: LifecycleOwner)
 }
+
+data class ScreenshotDetectionStatus(
+    val isSupported: Boolean,
+    val isRegistered: Boolean,
+    val androidApiLevel: Int = Build.VERSION.SDK_INT,
+    val notes: String = ""
+)
 ```
 
 ---

@@ -9,6 +9,7 @@ import androidx.lifecycle.DefaultLifecycleObserver
 import androidx.lifecycle.LifecycleOwner
 import java.lang.ref.WeakReference
 import java.util.UUID
+import java.util.WeakHashMap
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicBoolean
 
@@ -25,6 +26,10 @@ import java.util.concurrent.atomic.AtomicBoolean
  * **CRITICAL DISTINCTION**:
  * `FLAG_SECURE` applies to the entire [Window]. It is not a per-element or per-image canvas filter.
  * When enabled, all content displayed within that Activity's window surface is protected.
+ *
+ * ### Multi-Controller Coordination
+ * Multiple controllers attaching to the same [Window] would risk reference-count desynchronization.
+ * Use [SecureWindowController.getInstance] to obtain or share the canonical controller for a given [Window] or [Activity].
  *
  * ### Features
  * - **Reference Counting**: Allows multiple components (e.g. media viewer and sensitive banner)
@@ -46,6 +51,29 @@ class SecureWindowController(
      */
     constructor(activity: Activity, config: ProtectionConfig = ProtectionConfig()) : this(activity.window, config)
 
+    companion object {
+        private val windowControllers = WeakHashMap<Window, SecureWindowController>()
+
+        /**
+         * Returns or creates a coordinated [SecureWindowController] instance for the specified [Window].
+         * Prevents reference count collisions between multiple callers on the same window.
+         */
+        @Synchronized
+        fun getInstance(window: Window, config: ProtectionConfig = ProtectionConfig()): SecureWindowController {
+            return windowControllers.getOrPut(window) {
+                SecureWindowController(window, config)
+            }
+        }
+
+        /**
+         * Returns or creates a coordinated [SecureWindowController] instance for the specified [Activity].
+         */
+        @Synchronized
+        fun getInstance(activity: Activity, config: ProtectionConfig = ProtectionConfig()): SecureWindowController {
+            return getInstance(activity.window, config)
+        }
+    }
+
     private val windowRef: WeakReference<Window> = WeakReference(window)
     private val mainHandler = Handler(Looper.getMainLooper())
 
@@ -54,6 +82,9 @@ class SecureWindowController(
 
     // Set of currently active session IDs to tags
     private val activeSessions = ConcurrentHashMap<String, String>()
+
+    // Optional associated ScreenshotDetectionController to integrate detection status into aggregate reporting
+    var detectionController: ScreenshotDetectionController? = null
 
     // Status listener callback
     private var onStatusChangedListener: ((ProtectionStatus) -> Unit)? = null
@@ -122,13 +153,14 @@ class SecureWindowController(
     fun getStatus(): ProtectionStatus {
         val window = windowRef.get()
         val isSecure = window?.let { isFlagSecurePresent(it) } ?: false
+        val isDetectionRegistered = detectionController?.isRegistered() ?: false
         return ProtectionStatus(
             isWindowSecureActive = isSecure,
             activeSessionsCount = activeSessions.size,
             wasPreExistingSecure = wasPreExistingSecure,
             isScreenshotDetectionSupported = ScreenshotDetectionController.isSupported(),
-            isScreenshotDetectionRegistered = false,
-            platformNotes = getPlatformNotes(isSecure)
+            isScreenshotDetectionRegistered = isDetectionRegistered,
+            platformNotes = getPlatformNotes(isSecure, isDetectionRegistered)
         )
     }
 
@@ -204,11 +236,16 @@ class SecureWindowController(
         }
     }
 
-    private fun getPlatformNotes(isSecure: Boolean): String {
-        return if (isSecure) {
-            "FLAG_SECURE active on window. System screenshot captures & task previews are blocked. Note: Screenshot detection callback is suppressed by Android when FLAG_SECURE is active."
-        } else {
-            "Window is in standard capture-allowed state. Standard screenshots and screen recordings permitted."
+    private fun getPlatformNotes(isSecure: Boolean, isDetectionRegistered: Boolean): String {
+        return when {
+            isSecure && isDetectionRegistered ->
+                "FLAG_SECURE active. System captures blocked. Warning: Android 14+ ScreenCaptureCallback is suppressed by OS while FLAG_SECURE is active."
+            isSecure ->
+                "FLAG_SECURE active on window. System screenshot captures & task switcher previews are blocked."
+            isDetectionRegistered ->
+                "Standard window state with active Android 14+ screenshot detection callback. Screenshots will trigger notifications."
+            else ->
+                "Window is in standard capture-allowed state. Standard screenshots and screen recordings permitted."
         }
     }
 }

@@ -128,4 +128,66 @@ class SecureWindowControllerTest {
         assertEquals(0, controller.getStatus().activeSessionsCount)
         verify(mockWindow).clearFlags(WindowManager.LayoutParams.FLAG_SECURE)
     }
+
+    @Test
+    fun `getInstance returns canonical controller instance for same window`() {
+        val controller1 = SecureWindowController.getInstance(mockWindow)
+        val controller2 = SecureWindowController.getInstance(mockWindow)
+
+        assertEquals(controller1, controller2)
+    }
+
+    @Test
+    fun `detectionController updates getStatus isScreenshotDetectionRegistered accurately`() {
+        val controller = SecureWindowController(mockWindow)
+        assertFalse(controller.getStatus().isScreenshotDetectionRegistered)
+
+        val mockDetectionController = mock(ScreenshotDetectionController::class.java)
+        `when`(mockDetectionController.isRegistered()).thenReturn(true)
+
+        controller.detectionController = mockDetectionController
+        assertTrue(controller.getStatus().isScreenshotDetectionRegistered)
+        assertTrue(controller.getStatus().platformNotes.contains("screenshot detection callback"))
+    }
+
+    @Test
+    fun `autoRestoreOnRelease false leaves flags unchanged upon release`() {
+        val config = ProtectionConfig(autoRestoreOnRelease = false)
+        val controller = SecureWindowController(mockWindow, config)
+
+        val session = controller.acquireProtection("custom_config")
+        verify(mockWindow).addFlags(WindowManager.LayoutParams.FLAG_SECURE)
+
+        session.release()
+        // clearFlags should not be called because autoRestoreOnRelease is false
+        verify(mockWindow, times(0)).clearFlags(WindowManager.LayoutParams.FLAG_SECURE)
+    }
+
+    @Test
+    fun `preservePreExistingFlags false clears FLAG_SECURE even if pre-existing`() {
+        layoutParams.flags = WindowManager.LayoutParams.FLAG_SECURE
+        val config = ProtectionConfig(preservePreExistingFlags = false)
+        val controller = SecureWindowController(mockWindow, config)
+
+        val session = controller.acquireProtection("banner")
+        session.release()
+
+        // Because preservePreExistingFlags is false, clearFlags is executed
+        verify(mockWindow, times(1)).clearFlags(WindowManager.LayoutParams.FLAG_SECURE)
+    }
+
+    @Test
+    fun `status callback receives updates on acquire and release`() {
+        val controller = SecureWindowController(mockWindow)
+        var receivedCount = 0
+        controller.setOnStatusChangedListener {
+            receivedCount++
+        }
+
+        val session = controller.acquireProtection("notified")
+        assertEquals(1, receivedCount)
+
+        session.release()
+        assertEquals(2, receivedCount)
+    }
 }

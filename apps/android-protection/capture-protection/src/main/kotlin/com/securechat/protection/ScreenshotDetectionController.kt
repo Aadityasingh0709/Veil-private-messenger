@@ -96,6 +96,25 @@ class ScreenshotDetectionController(
     fun isRegistered(): Boolean = isRegistered.get()
 
     /**
+     * Returns an immutable status snapshot of the screenshot detection subsystem.
+     */
+    fun getStatus(): ScreenshotDetectionStatus {
+        val supported = isSupported()
+        val registered = isRegistered.get()
+        val notes = when {
+            !supported -> "Screenshot detection requires Android 14 (API 34) or higher. Current device API level is ${Build.VERSION.SDK_INT}."
+            registered -> "Activity.ScreenCaptureCallback registered. Supported hardware-button screenshots will trigger notifications. Note: Android suppresses this callback if FLAG_SECURE is active or during ADB screencap."
+            else -> "Screenshot detection supported (API >= 34) but callback is not currently registered."
+        }
+        return ScreenshotDetectionStatus(
+            isSupported = supported,
+            isRegistered = registered,
+            androidApiLevel = Build.VERSION.SDK_INT,
+            notes = notes
+        )
+    }
+
+    /**
      * Binds registration to the Activity lifecycle:
      * - Registers on [Lifecycle.Event.ON_START]
      * - Unregisters on [Lifecycle.Event.ON_STOP]
