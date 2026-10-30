@@ -32,6 +32,12 @@
   padding: 0;
 }
 
+html,
+body,
+#root {
+  height: 100%;
+}
+
 body {
   font-family: var(--font-family);
   background-color: var(--color-bg-app);
@@ -264,6 +270,7 @@ a:hover {
   display: grid;
   grid-template-columns: 360px 1fr;
   height: 100vh;
+  height: 100dvh;
   max-width: 1300px;
   margin: 0 auto;
   background: var(--color-bg-surface);
@@ -279,11 +286,15 @@ a:hover {
   display: flex;
   flex-direction: column;
   height: 100%;
+  min-height: 0;
+  min-width: 0;
+  overflow: hidden;
   border-right: 1px solid var(--color-border);
   background: var(--color-bg-surface);
 }
 
 .sidebar-navigation {
+  flex-shrink: 0;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -346,6 +357,7 @@ a:hover {
 }
 
 .sidebar-section-title {
+  flex-shrink: 0;
   padding: 12px 16px 6px;
   font-size: 11px;
   font-weight: 700;
@@ -355,6 +367,7 @@ a:hover {
 
 /* User Search */
 .user-search-container {
+  flex-shrink: 0;
   padding: 8px 16px;
   position: relative;
 }
@@ -442,8 +455,10 @@ a:hover {
 
 /* Chat List */
 .chat-list-scroll {
-  flex: 1;
+  flex: 1 1 0%;
+  min-height: 0;
   overflow-y: auto;
+  overflow-x: hidden;
   display: flex;
   flex-direction: column;
 }
@@ -520,6 +535,9 @@ a:hover {
   display: flex;
   flex-direction: column;
   height: 100%;
+  min-height: 0;
+  min-width: 0;
+  overflow: hidden;
   background: #ffffff;
 }
 
@@ -530,12 +548,14 @@ a:hover {
 }
 
 .thread-header {
+  flex-shrink: 0;
   display: flex;
   align-items: center;
   gap: 12px;
   padding: 14px 20px;
   border-bottom: 1px solid var(--color-border);
   background: #ffffff;
+  z-index: 2;
 }
 
 .btn-back-mobile {
@@ -551,13 +571,43 @@ a:hover {
 }
 
 .messages-viewport {
-  flex: 1;
+  flex: 1 1 0%;
+  min-height: 0;
   overflow-y: auto;
+  overflow-x: hidden;
   padding: 20px;
   display: flex;
   flex-direction: column;
   gap: 12px;
   background: linear-gradient(180deg, #f8fafc 0%, #f1f5f9 100%);
+}
+
+/* Scrollbar styling for smooth, modern UX */
+.messages-viewport::-webkit-scrollbar,
+.chat-list-scroll::-webkit-scrollbar {
+  width: 6px;
+}
+
+.messages-viewport::-webkit-scrollbar-track,
+.chat-list-scroll::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.messages-viewport::-webkit-scrollbar-thumb,
+.chat-list-scroll::-webkit-scrollbar-thumb {
+  background: rgba(148, 163, 184, 0.4);
+  border-radius: 9999px;
+}
+
+.messages-viewport::-webkit-scrollbar-thumb:hover,
+.chat-list-scroll::-webkit-scrollbar-thumb:hover {
+  background: rgba(100, 116, 139, 0.7);
+}
+
+.messages-viewport,
+.chat-list-scroll {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(148, 163, 184, 0.4) transparent;
 }
 
 /* Message Bubble */
@@ -968,6 +1018,7 @@ a:hover {
   position: relative;
   display: flex;
   flex-direction: column;
+  flex-shrink: 0;
   background: #ffffff;
   border-top: 1px solid var(--color-border);
 }

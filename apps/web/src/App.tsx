@@ -33,6 +33,8 @@ function ChatApp() {
 
   const socketRef = useRef<Socket>();
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const messagesViewportRef = useRef<HTMLDivElement>(null);
+  const prevConversationIdRef = useRef<string>();
   const selectedConversationIdRef = useRef<string>();
   const conversationLoadIdRef = useRef(0);
 
@@ -151,10 +153,23 @@ function ChatApp() {
     };
   }, [me?.id]);
 
-  // Auto-scroll messages container to bottom on new message or typing
+  // Auto-scroll messages container to bottom on new message, conversation switch, or typing
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages, typing]);
+    if (!messagesViewportRef.current) return;
+    const isNewConversation = prevConversationIdRef.current !== selected?.id;
+    prevConversationIdRef.current = selected?.id;
+
+    if (isNewConversation) {
+      // Instant snap to bottom when switching/opening conversations
+      messagesViewportRef.current.scrollTop = messagesViewportRef.current.scrollHeight;
+    } else {
+      // Smooth scroll on incoming messages or typing indicator
+      messagesViewportRef.current.scrollTo({
+        top: messagesViewportRef.current.scrollHeight,
+        behavior: "smooth"
+      });
+    }
+  }, [messages, typing, selected?.id]);
 
   // Open a conversation and load history
   const openConversation = async (conversation: ConversationDto) => {
@@ -288,7 +303,7 @@ function ChatApp() {
               </div>
             </header>
 
-            <div className="messages-viewport">
+            <div className="messages-viewport" ref={messagesViewportRef}>
               {messages.length === 0 ? (
                 <EmptyState
                   title="No messages yet"
