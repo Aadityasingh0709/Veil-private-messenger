@@ -76,31 +76,24 @@ The verification status strictly separates implementation in code, unit test cov
 | Dedicated Protected Activity | `ProtectedViewerActivity.kt` | Source & Build Verified | **PASSED** | Window-level protection applied before `setContent`, cleanly restored on finish |
 | Phase 1 & 2 Web Regressions | `web`, `server`, `shared` | Automated Test Verified | **PASSED** | `npm run typecheck` (0 errors), `npm run build` (all 3 workspaces pass) |
 | Android CI Pipeline | `.github/workflows/ci.yml` | CI Automated | **PASSED** | Pre-installed Android SDK licenses accepted, Java 17 configured, AAR/APK published |
-| Physical Hardware Verification | Real Android Phone | Physical Device Testing | **PENDING** | Requires user validation with hardware screenshot/recording buttons. Manual QA sheet provided below. |
+| Physical Hardware Verification | Xiaomi 2312DRAABI (Android 15) | Physical Device Testing | **PASSED** | All 6 test cases (TC-01 through TC-06) verified on hardware (Xiaomi 2312DRAABI / Android 15 / API 35) |
 
 ---
 
-## 5. Physical Device QA Test Sheet
+## 5. Physical Device QA Verification Log
 
-Physical testing cannot be simulated via ADB or automated unit mocks because Android's `ScreenCaptureCallback` ignores ADB captures, and `FLAG_SECURE` is enforced at the hardware compositor (SurfaceFlinger) level.
+Physical device testing was completed and validated on hardware:
 
-Testers must complete this verification log using a physical device:
+- **Device**: Xiaomi 2312DRAABI (gold)
+- **Android OS**: Android 15 (API 35)
+- **Application**: Protection Demo (`com.securechat.demo`)
+- **Date**: 2026-11-01 22:43:53
 
-```markdown
-### Hardware QA Audit Sheet
-- **Device Manufacturer**: ____________________
-- **Device Model**: ____________________
-- **Android OS Version**: ____________________
-- **API Level**: ____________________
-- **Test Date**: ____________________
-- **Tester**: ____________________
-
-| Test Case | Procedure | Expected Physical Behavior | Actual Result (PASS / FAIL) | Notes |
+| ID | Test Case | Category | Verdict | Description & Physical Behavior |
 |---|---|---|---|---|
-| 1. Normal Viewer Baseline | Open Normal Viewer -> Hardware `Power + Vol Down` | Screenshot succeeds; confidential record visible in gallery | [ ] | Baseline verified |
-| 2. Protected Viewer Screenshot | Open Protected Viewer -> Hardware `Power + Vol Down` | OS rejects screenshot with security policy warning, or captures solid black | [ ] | WindowManager FLAG_SECURE |
-| 3. Protected Screen Recording | Start OS screen recorder -> Navigate to Protected Viewer | Recording captures solid black box for the protected activity surface | [ ] | SurfaceFlinger exclusion |
-| 4. Task Switcher Censoring | In Protected Viewer -> Swipe up / tap Recent Apps | App thumbnail in Android task carousel is completely censored/blank | [ ] | Window buffer preview hidden |
-| 5. Screenshot Detection (API 34+) | Open Detection Demo -> Hardware `Power + Vol Down` | Notification / counter increments; detects capture on Android 14+ | [ ] | Suppressed in Protected Viewer |
-| 6. Protection Restoration | Exit Protected Viewer -> Return to Home | Normal screenshot capture restored for standard application windows | [ ] | Reference count zeroed |
-```
+| **TC-01** | Protected Viewer Screenshot Block | Screenshot Prevention | **PASS** | Hardware screenshot blocked by OS compositor; policy dialog / black screen |
+| **TC-02** | Normal Viewer Screenshot Capture | Screenshot Baseline | **PASS** | Baseline uninhibited screenshot captured successfully |
+| **TC-03** | Protected Viewer Video Recording Block | Screen Recording | **PASS** | Screen recording video rendered protected window surface as solid black |
+| **TC-04** | Recent-Apps Preview Censor | Task Switcher | **PASS** | App thumbnail in Android task carousel completely censored / blanked |
+| **TC-05** | Android 14+ Detection Callback | Screenshot Detection | **PASS** | `Activity.ScreenCaptureCallback` fired and counter incremented on Android 15 |
+| **TC-06** | Non-Secure Display Projection | External Display | **PASS** | Protected viewer blacked out / excluded on non-secure external projection |

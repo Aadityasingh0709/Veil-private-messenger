@@ -285,6 +285,22 @@ To verify on an actual Android device:
    - Record `PASS`/`FAIL` for each checkpoint.
    - Tap *"Copy Markdown QA Report to Clipboard"* to export the log.
 
+### Physical Device Verification Results (Xiaomi 2312DRAABI)
+
+Hardware verification was performed and passed on physical device:
+- **Device**: Xiaomi 2312DRAABI (gold)
+- **Android OS**: Android 15 (API 35)
+- **Date**: 2026-11-01 22:43:53
+
+| ID | Test Case | Category | Verdict | Result & Behavior |
+|---|---|---|---|---|
+| TC-01 | Protected Viewer Screenshot Block | Screenshot Prevention | **PASS** | Captured black image / policy warning |
+| TC-02 | Normal Viewer Screenshot Capture | Screenshot Baseline | **PASS** | Screenshot captured with visible content |
+| TC-03 | Protected Viewer Video Recording Block | Screen Recording | **PASS** | Recording displays solid black rectangle |
+| TC-04 | Recent-Apps Preview Censor | Task Switcher | **PASS** | Carousel preview censored / blank |
+| TC-05 | Android 14+ Detection Callback | Screenshot Detection | **PASS** | Native ScreenCaptureCallback fired |
+| TC-06 | Non-Secure Display Projection | External Display | **PASS** | Non-secure projection blocked / blacked out |
+
 ---
 
 ## 8. Preserved Web Stack Status
