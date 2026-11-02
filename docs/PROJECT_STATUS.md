@@ -97,3 +97,13 @@ Physical device testing was completed and validated on hardware:
 | **TC-04** | Recent-Apps Preview Censor | Task Switcher | **PASS** | App thumbnail in Android task carousel completely censored / blanked |
 | **TC-05** | Android 14+ Detection Callback | Screenshot Detection | **PASS** | `Activity.ScreenCaptureCallback` fired and counter incremented on Android 15 |
 | **TC-06** | Non-Secure Display Projection | External Display | **PASS** | Protected viewer blacked out / excluded on non-secure external projection |
+
+---
+
+## 6. Next Steps & Phase 4 Preparation
+
+With Phase 3 complete and physically verified across hardware checkpoints, upcoming efforts will transition toward **Phase 4: Optical Anti-Capture Prototype**:
+- Exploration of spatial/temporal frequency modulation against external camera sensors (the "Analog Hole").
+- Researching human visual persistence (flicker fusion threshold) vs. camera rolling shutter speeds.
+- Developing experimental prototypes for layered visual patterns that degrade secondary camera captures while retaining legibility for the human eye.
+
