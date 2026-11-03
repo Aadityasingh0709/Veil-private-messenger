@@ -1,0 +1,112 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "VeilOpticalExperimentManifest",
+  "description": "Standardized schema for Veil Phase 4A Optical Research Lab experiment manifests",
+  "type": "object",
+  "required": [
+    "schemaVersion",
+    "experimentId",
+    "timestamp",
+    "testMode",
+    "sourceImage",
+    "phoneA",
+    "phoneB",
+    "captures"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "type": "string",
+      "enum": ["1.0.0"]
+    },
+    "experimentId": {
+      "type": "string",
+      "pattern": "^EXP-[0-9]{8}-[0-9]{6}-[A-Za-z0-9_-]+$"
+    },
+    "timestamp": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "testMode": {
+      "type": "string",
+      "enum": ["baseline", "spatial_modulation", "temporal_modulation", "combined_modulation"]
+    },
+    "sourceImage": {
+      "type": "object",
+      "required": ["name", "hash_sha256", "width", "height"],
+      "properties": {
+        "name": { "type": "string" },
+        "hash_sha256": { "type": "string", "pattern": "^[a-fA-F0-9]{64}$" },
+        "width": { "type": "integer", "minimum": 1 },
+        "height": { "type": "integer", "minimum": 1 }
+      }
+    },
+    "phoneA": {
+      "type": "object",
+      "required": [
+        "manufacturer",
+        "model",
+        "androidVersion",
+        "apiLevel",
+        "displayResolution",
+        "refreshRateHz"
+      ],
+      "properties": {
+        "manufacturer": { "type": ["string", "null"] },
+        "model": { "type": ["string", "null"] },
+        "androidVersion": { "type": ["string", "null"] },
+        "apiLevel": { "type": ["integer", "null"] },
+        "displayResolution": { "type": ["string", "null"] },
+        "refreshRateHz": { "type": ["number", "null"] },
+        "supportedRefreshRates": {
+          "type": ["array", "null"],
+          "items": { "type": "number" }
+        },
+        "screenBrightnessPercent": { "type": ["number", "null"], "minimum": 0, "maximum": 100 },
+        "adaptiveBrightness": { "type": ["boolean", "null"] },
+        "screenOrientation": { "type": ["string", "null"] }
+      }
+    },
+    "phoneB": {
+      "type": "object",
+      "required": ["captureMode"],
+      "properties": {
+        "manufacturer": { "type": ["string", "null"] },
+        "model": { "type": ["string", "null"] },
+        "cameraResolution": { "type": ["string", "null"] },
+        "exposureTimeSeconds": { "type": ["number", "string", "null"] },
+        "iso": { "type": ["integer", "null"] },
+        "focusMode": { "type": ["string", "null"] },
+        "whiteBalance": { "type": ["string", "null"] },
+        "distanceCm": { "type": ["number", "null"], "minimum": 0 },
+        "cameraAngleDegrees": { "type": ["number", "null"] },
+        "ambientLighting": { "type": ["string", "null"] },
+        "captureMode": { "type": "string", "enum": ["auto", "manual", "unknown"] }
+      }
+    },
+    "captures": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["filename", "repetitionNumber"],
+        "properties": {
+          "filename": { "type": "string" },
+          "hash_sha256": { "type": ["string", "null"] },
+          "repetitionNumber": { "type": "integer", "minimum": 1 },
+          "timestamp": { "type": ["string", "null"] },
+          "exif": {
+            "type": ["object", "null"],
+            "properties": {
+              "make": { "type": ["string", "null"] },
+              "model": { "type": ["string", "null"] },
+              "focalLength": { "type": ["string", "number", "null"] },
+              "fNumber": { "type": ["string", "number", "null"] },
+              "exposureTime": { "type": ["string", "number", "null"] },
+              "iso": { "type": ["integer", "string", "null"] }
+            }
+          }
+        }
+      }
+    },
+    "notes": { "type": "string" }
+  }
+}

@@ -34,3 +34,14 @@ storage/
 **/storage/
 uploads/
 **/uploads/
+
+# Python & Research Artifacts
+__pycache__/
+**/__pycache__/
+*.py[cod]
+.venv/
+**/.venv/
+.pytest_cache/
+**/.pytest_cache/
+research/optical-capture/experiments/
+research/optical-capture/reports/

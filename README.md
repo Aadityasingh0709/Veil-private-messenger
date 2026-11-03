@@ -269,14 +269,15 @@ cd apps/android-protection && ./gradlew :capture-protection:test
 | **Phase 1** | Core Messaging | ✅ **Completed** | Full auth, durable revocation, MongoDB persistence, Socket.IO text messaging |
 | **Phase 2** | Media Messaging & Viewer | ✅ **Completed** | Private disk storage, range streaming, custom viewer, soft deletion, emoji picker |
 | **Phase 3** | Android Capture Protection SDK | ✅ **Completed** | Reusable `capture-protection` AAR, Compose `protection-demo` APK, physical QA lab |
-| **Phase 4** | Optical Anti-Capture Prototype | 🔬 Planned | Software-based spatial/temporal modulation against external camera photography |
+| **Phase 4A** | Optical Research Lab & Baseline System | ✅ **Completed** | Dedicated Android app (`optical-research`), 7 synthetic targets, Python analysis pipeline (PSNR/SSIM) |
+| **Phase 4B** | Spatial & Temporal Modulation Experiments | 🔬 Planned | Software-based spatial/temporal modulation against external camera photography |
 | **Phase 5** | Native Android Protection Engine | 🔲 Planned | OpenGL ES / Vulkan / NDK real-time rendering engine |
 | **Phase 6** | Native Protected Messenger | 🔲 Planned | Integration of messaging client with native protection SDK |
 | **Phase 7** | View-Once & Ephemeral Media | 🔲 Planned | Expiring media attachments with server-side auto-purge |
 | **Phase 8** | Adaptive Protection | 🔲 Planned | Dynamic parameter tuning based on ambient light and display properties |
 | **Phase 9** | ML Optimization & Benchmarking | 🔲 Planned | Machine learning assisted anti-capture parameter optimization |
 
-> Detailed technical specifications are available in [PROJECT_VISION.md](docs/PROJECT_VISION.md) and [PHASE3_ANDROID_PROTECTION.md](docs/PHASE3_ANDROID_PROTECTION.md).
+> Detailed technical specifications are available in [PROJECT_VISION.md](docs/PROJECT_VISION.md), [PHASE3_ANDROID_PROTECTION.md](docs/PHASE3_ANDROID_PROTECTION.md), [PHASE4_RESEARCH_BACKGROUND.md](docs/PHASE4_RESEARCH_BACKGROUND.md), and [PHASE4A_BASELINE_PROTOCOL.md](docs/PHASE4A_BASELINE_PROTOCOL.md).
 
 ---
 

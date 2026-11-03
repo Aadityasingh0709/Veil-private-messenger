@@ -1,0 +1,89 @@
+{
+  "version": "1.0.0",
+  "description": "Deterministic Synthetic Reference Charts for Phase 4A Baseline Capture",
+  "standard_resolution": {
+    "width": 1080,
+    "height": 1920
+  },
+  "fiducial_markers": {
+    "type": "concentric_bullseye",
+    "margin_px": 60,
+    "marker_radius_px": 36,
+    "corner_coordinates": {
+      "top_left": [
+        60,
+        60
+      ],
+      "top_right": [
+        1020,
+        60
+      ],
+      "bottom_right": [
+        1020,
+        1860
+      ],
+      "bottom_left": [
+        60,
+        1860
+      ]
+    }
+  },
+  "charts": [
+    {
+      "filename": "chart_color_calibration.png",
+      "title": "Color Calibration Chart",
+      "width": 1080,
+      "height": 1920,
+      "sha256": "6ecf384766224aee9c4084e2329fce8ad31399d78832ebcbbe191b3de9aef97d",
+      "bytes": 34443
+    },
+    {
+      "filename": "chart_grayscale_gradient.png",
+      "title": "Grayscale Gradient Chart",
+      "width": 1080,
+      "height": 1920,
+      "sha256": "8827f06baee71964279e1989c60585c778f3132c6a416f90143b20f725a4148e",
+      "bytes": 48342
+    },
+    {
+      "filename": "chart_checkerboard.png",
+      "title": "Checkerboard Grid",
+      "width": 1080,
+      "height": 1920,
+      "sha256": "bb5e6ef11fab5676eaf33c51b0a54f71a50cf9b6c5f8bdefe27aa83838436fdb",
+      "bytes": 26371
+    },
+    {
+      "filename": "chart_fine_lines.png",
+      "title": "Fine-Line & Resolution Target",
+      "width": 1080,
+      "height": 1920,
+      "sha256": "515085ad480b3561b49e559b51622eca735fccd0fb03211980cea967cf56ba6a",
+      "bytes": 45199
+    },
+    {
+      "filename": "chart_high_contrast_edges.png",
+      "title": "High-Contrast Edge & MTF Target",
+      "width": 1080,
+      "height": 1920,
+      "sha256": "c2dadbb6f4b3d1ca4e6273c5f41c29068bcd74052c020e3726b552b95cb9e2bd",
+      "bytes": 37306
+    },
+    {
+      "filename": "chart_text_readability.png",
+      "title": "Typographic Legibility Chart",
+      "width": 1080,
+      "height": 1920,
+      "sha256": "e9b50fea0ed5db27f0695d41e8c76b67d8af67c345121c95bf190c3360c0da23",
+      "bytes": 127520
+    },
+    {
+      "filename": "chart_combined_quality.png",
+      "title": "Master Combined Quality Target",
+      "width": 1080,
+      "height": 1920,
+      "sha256": "a4913c01dbfdcf9431667069634f83929fe7c0f6a761b5359af12173f830be5e",
+      "bytes": 47437
+    }
+  ]
+}

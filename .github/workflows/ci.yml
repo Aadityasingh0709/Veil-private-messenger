@@ -118,7 +118,7 @@ jobs:
 
       - name: Run unit tests
         working-directory: apps/android-protection
-        run: ./gradlew :capture-protection:test --stacktrace
+        run: ./gradlew :capture-protection:test :optical-research:test --stacktrace
 
       - name: Build Capture Protection Library (Release AAR)
         working-directory: apps/android-protection
@@ -128,15 +128,50 @@ jobs:
         working-directory: apps/android-protection
         run: ./gradlew :protection-demo:assembleDebug --stacktrace
 
-      - name: Upload Debug APK Artifact
+      - name: Build Optical Research Application (Debug APK)
+        working-directory: apps/android-protection
+        run: ./gradlew :optical-research:assembleDebug --stacktrace
+
+      - name: Upload Protection Demo Debug APK Artifact
         uses: actions/upload-artifact@v4
         with:
           name: protection-demo-debug-apk
           path: apps/android-protection/protection-demo/build/outputs/apk/debug/*.apk
+
+      - name: Upload Optical Research Debug APK Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: optical-research-debug-apk
+          path: apps/android-protection/optical-research/build/outputs/apk/debug/*.apk
 
       - name: Upload Release AAR Artifact
         uses: actions/upload-artifact@v4
         with:
           name: capture-protection-release-aar
           path: apps/android-protection/capture-protection/build/outputs/aar/*.aar
+
+  optical-analysis-tests:
+    name: Optical Analysis Python Pipeline Tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+          cache-dependency-path: research/optical-capture/python/requirements.txt
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r research/optical-capture/python/requirements.txt
+
+      - name: Generate synthetic reference charts
+        run: python research/optical-capture/python/generate_test_charts.py
+
+      - name: Run pytest test suite
+        run: pytest research/optical-capture/python/tests/ -v
 

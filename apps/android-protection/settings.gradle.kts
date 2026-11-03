@@ -23,3 +23,4 @@ dependencyResolutionManagement {
 rootProject.name = "android-protection"
 include(":capture-protection")
 include(":protection-demo")
+include(":optical-research")
