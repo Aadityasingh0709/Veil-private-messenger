@@ -36,6 +36,15 @@
             android:configChanges="orientation|screenSize|screenLayout|keyboardHidden"
             android:theme="@style/Theme.VeilOpticalResearch.Fullscreen" />
 
+        <!-- Dedicated Fullscreen Activity for Phase 4B Modulation Experiment Display -->
+        <activity
+            android:name=".ui.ModulationDisplayActivity"
+            android:exported="false"
+            android:label="Veil Modulation Display"
+            android:screenOrientation="portrait"
+            android:configChanges="orientation|screenSize|screenLayout|keyboardHidden"
+            android:theme="@style/Theme.VeilOpticalResearch.Fullscreen" />
+
         <provider
             android:name="androidx.core.content.FileProvider"
             android:authorities="${applicationId}.fileprovider"
