@@ -1,6 +1,6 @@
 # Phase 4 Status — Optical Anti-Capture Research
 
-## Current Phase: PHASE 4A (Optical Research Lab and Baseline Capture System)
+## Current Phase: PHASE 4B (Spatial & Temporal Modulation Experiments)
 
 **Status**: **IMPLEMENTED & VERIFIED**  
 **Repository**: [https://github.com/Aadityasingh0709/Veil-private-messenger](https://github.com/Aadityasingh0709/Veil-private-messenger)
@@ -14,8 +14,8 @@
 | **Phase 1** | Core Messaging | **Completed** | Full auth, durable JWT revocation, MongoDB persistence, Socket.IO real-time chat |
 | **Phase 2** | Media Messaging & Viewer | **Completed** | Private disk storage, streaming video (HTTP 206), custom viewer, soft deletion, emoji picker |
 | **Phase 3** | Android Capture Protection SDK | **Completed** | Reusable `capture-protection` AAR, Compose `protection-demo` APK, physical QA lab (Xiaomi Android 15 verification) |
-| **Phase 4A** | **Optical Research Lab & Baseline System** | **Completed (Current)** | **Dedicated Android research app (`optical-research`), 7 synthetic test charts, two-phone protocol, offline Python analysis pipeline, perspective homography alignment, PSNR/SSIM evaluation** |
-| **Phase 4B** | Spatial & Temporal Modulation | Planned | Experimental spatial frequency patterns and VSYNC-synchronized temporal frame modulation |
+| **Phase 4A** | Optical Research Lab & Baseline System | **Completed** | Dedicated Android research app (`optical-research`), 7 synthetic test charts, two-phone protocol, offline Python analysis pipeline, perspective homography alignment, PSNR/SSIM evaluation |
+| **Phase 4B** | **Spatial & Temporal Modulation** | **Completed (Current)** | **Spatial frequency patterns (6 types), VSYNC-synchronized temporal frame modulation (≤3Hz), combined modulation, live HUD parameter control, hardware frame diagnostics, comparative evaluation CLI (`compare_modulation.py`), unit test suite** |
 | **Phase 4C** | Parameter Optimization & Human Quality | Planned | Objective vs subjective image quality optimization; human readability and visual comfort evaluation |
 | **Phase 4D** | Integrated Optical Protection Prototype | Planned | Proof-of-concept research prototype integrating anti-capture rendering into viewer workflows |
 | **Phase 5** | Native Protection Engine | Planned | NDK / OpenGL ES / Vulkan hardware rendering engine |
