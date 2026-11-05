@@ -1,0 +1,158 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "VeilPhase4BOpticalExperimentManifest",
+  "description": "Extended schema for Veil Phase 4B Spatial and Temporal Modulation Experiment Manifests",
+  "type": "object",
+  "required": [
+    "schemaVersion",
+    "experimentId",
+    "timestamp",
+    "testMode",
+    "sourceImage",
+    "phoneA",
+    "phoneB",
+    "captures"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "type": "string",
+      "enum": ["1.0.0", "1.1.0"]
+    },
+    "experimentId": {
+      "type": "string",
+      "pattern": "^EXP-[0-9]{8}-[0-9]{6}-[A-Za-z0-9_-]+$"
+    },
+    "timestamp": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "testMode": {
+      "type": "string",
+      "enum": [
+        "baseline",
+        "spatial_modulation",
+        "temporal_modulation",
+        "combined_modulation"
+      ]
+    },
+    "sourceImage": {
+      "type": "object",
+      "required": ["name", "hash_sha256", "width", "height"],
+      "properties": {
+        "name": { "type": "string" },
+        "hash_sha256": { "type": "string", "pattern": "^[a-fA-F0-9]{64}$" },
+        "width": { "type": "integer", "minimum": 1 },
+        "height": { "type": "integer", "minimum": 1 }
+      }
+    },
+    "phoneA": {
+      "type": "object",
+      "required": ["manufacturer", "model"],
+      "properties": {
+        "manufacturer": { "type": "string" },
+        "model": { "type": "string" },
+        "androidVersion": { "type": "string" },
+        "apiLevel": { "type": "integer" },
+        "displayResolution": { "type": "string" },
+        "refreshRateHz": { "type": "number" },
+        "supportedRefreshRates": {
+          "type": ["array", "null"],
+          "items": { "type": "number" }
+        },
+        "screenBrightnessPercent": {
+          "type": ["number", "null"],
+          "minimum": 0,
+          "maximum": 100
+        },
+        "adaptiveBrightness": { "type": ["boolean", "null"] },
+        "screenOrientation": { "type": ["string", "null"] }
+      }
+    },
+    "phoneB": {
+      "type": "object",
+      "required": ["captureMode"],
+      "properties": {
+        "manufacturer": { "type": ["string", "null"] },
+        "model": { "type": ["string", "null"] },
+        "cameraResolution": { "type": ["string", "null"] },
+        "exposureTimeSeconds": { "type": ["number", "string", "null"] },
+        "iso": { "type": ["integer", "null"] },
+        "focusMode": { "type": ["string", "null"] },
+        "whiteBalance": { "type": ["string", "null"] },
+        "distanceCm": { "type": ["number", "null"], "minimum": 0 },
+        "cameraAngleDegrees": { "type": ["number", "null"] },
+        "ambientLighting": { "type": ["string", "null"] },
+        "captureMode": {
+          "type": "string",
+          "enum": ["auto", "manual", "unknown"]
+        }
+      }
+    },
+    "modulationParams": {
+      "type": "object",
+      "properties": {
+        "modulationType": {
+          "type": "string",
+          "enum": ["none", "spatial", "temporal", "combined"]
+        },
+        "spatialPattern": {
+          "type": "string",
+          "enum": [
+            "HORIZONTAL_LINES",
+            "VERTICAL_LINES",
+            "DIAGONAL_LINES",
+            "CHECKERBOARD",
+            "RADIAL_GRID",
+            "SINE_WAVE"
+          ]
+        },
+        "gridPeriodPx": { "type": "integer", "minimum": 2, "maximum": 64 },
+        "contrastRatio": { "type": "number", "minimum": 0, "maximum": 0.15 },
+        "orientationDeg": { "type": "number", "minimum": 0, "maximum": 179 },
+        "modulationFrequencyHz": {
+          "type": "number",
+          "minimum": 0.1,
+          "maximum": 3.0
+        },
+        "dutyCycle": { "type": "number", "minimum": 0.05, "maximum": 0.95 },
+        "amplitudeFraction": { "type": "number", "minimum": 0, "maximum": 0.15 }
+      }
+    },
+    "renderingDiagnostics": {
+      "type": "object",
+      "properties": {
+        "totalFramesRecorded": { "type": "integer", "minimum": 0 },
+        "meanIntervalMs": { "type": "number", "minimum": 0 },
+        "recentMeanFps": { "type": "number", "minimum": 0 },
+        "estimatedDroppedFrames": { "type": "integer", "minimum": 0 },
+        "minIntervalMs": { "type": "number", "minimum": 0 },
+        "maxIntervalMs": { "type": "number", "minimum": 0 }
+      }
+    },
+    "captures": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["filename", "repetitionNumber"],
+        "properties": {
+          "filename": { "type": "string" },
+          "hash_sha256": { "type": ["string", "null"] },
+          "repetitionNumber": { "type": "integer", "minimum": 1 },
+          "timestamp": { "type": ["string", "null"] },
+          "exif": {
+            "type": ["object", "null"],
+            "properties": {
+              "make": { "type": ["string", "null"] },
+              "model": { "type": ["string", "null"] },
+              "focalLength": { "type": ["string", "number", "null"] },
+              "fNumber": { "type": ["string", "number", "null"] },
+              "exposureTime": { "type": ["string", "number", "null"] },
+              "iso": { "type": ["integer", "string", "null"] }
+            }
+          }
+        }
+      }
+    },
+    "notes": { "type": "string" }
+  }
+}
