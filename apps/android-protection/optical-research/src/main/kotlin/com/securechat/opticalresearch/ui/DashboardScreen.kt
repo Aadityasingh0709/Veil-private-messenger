@@ -31,7 +31,8 @@ fun DashboardScreen(
     onNavigateGallery: () -> Unit,
     onNavigateImport: (String?) -> Unit,
     onNavigateResults: (String) -> Unit,
-    onExportLatest: () -> Unit
+    onExportLatest: () -> Unit,
+    onNavigateModulation: (String) -> Unit = {}
 ) {
     val latestExp = experiments.firstOrNull()
 
@@ -46,7 +47,7 @@ fun DashboardScreen(
                             color = LabTextPrimary
                         )
                         Text(
-                            text = "PHASE 4A // BASELINE OPTICAL EXPERIMENTATION",
+                            text = "PHASE 4A/4B // OPTICAL BASELINE & MODULATION EXPERIMENTS",
                             style = MaterialTheme.typography.labelSmall,
                             color = LabPrimary
                         )
@@ -227,6 +228,77 @@ fun DashboardScreen(
                                 if (latestExp != null) onNavigateResults(latestExp.experimentId)
                                 else onNavigateNewExperiment()
                             }
+                        )
+                    }
+                }
+            }
+
+            // Phase 4B: Modulation Experiments Section
+            item {
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(top = 4.dp, bottom = 4.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = "Phase 4B — Modulation Experiments",
+                        fontWeight = FontWeight.SemiBold,
+                        color = LabTextPrimary
+                    )
+                    Badge(containerColor = LabPrimary.copy(alpha = 0.2f)) {
+                        Text(
+                            text = "PHASE 4B",
+                            color = LabPrimary,
+                            fontSize = 10.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+                }
+            }
+
+            item {
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        ActionButton(
+                            modifier = Modifier.weight(1f),
+                            title = "Spatial Mod",
+                            subtitle = "Mode 1: 6 patterns",
+                            icon = Icons.Default.GridOn,
+                            tint = LabPrimary,
+                            onClick = { onNavigateModulation("spatial") }
+                        )
+                        ActionButton(
+                            modifier = Modifier.weight(1f),
+                            title = "Temporal Mod",
+                            subtitle = "Mode 2: VSYNC ≤3Hz",
+                            icon = Icons.Default.Speed,
+                            tint = LabWarning,
+                            onClick = { onNavigateModulation("temporal") }
+                        )
+                    }
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        ActionButton(
+                            modifier = Modifier.weight(1f),
+                            title = "Combined Mod",
+                            subtitle = "Mode 3: Spatial + Temporal",
+                            icon = Icons.Default.Layers,
+                            tint = LabSuccess,
+                            onClick = { onNavigateModulation("combined") }
+                        )
+                        ActionButton(
+                            modifier = Modifier.weight(1f),
+                            title = "Static Baseline",
+                            subtitle = "Phase 4A control",
+                            icon = Icons.Default.AspectRatio,
+                            tint = LabSecondary,
+                            onClick = { onNavigateModulation("baseline") }
                         )
                     }
                 }
