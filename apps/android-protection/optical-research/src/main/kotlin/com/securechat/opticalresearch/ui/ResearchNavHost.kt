@@ -74,6 +74,9 @@ fun ResearchNavHost(
                     } else {
                         Toast.makeText(context, "No experiments logged yet", Toast.LENGTH_SHORT).show()
                     }
+                },
+                onNavigateModulation = { mode ->
+                    navController.navigate("gallery_modulation/$mode")
                 }
             )
         }
@@ -93,6 +96,26 @@ fun ResearchNavHost(
                     val intent = Intent(context, BaselineDisplayActivity::class.java).apply {
                         putExtra(BaselineDisplayActivity.EXTRA_CHART_TYPE, chartType.name)
                         putExtra(BaselineDisplayActivity.EXTRA_EXPERIMENT_ID, expId)
+                    }
+                    context.startActivity(intent)
+                    refreshExperiments()
+                },
+                onBack = { navController.popBackStack() }
+            )
+        }
+
+        composable(
+            route = "gallery_modulation/{mode}",
+            arguments = listOf(navArgument("mode") { type = NavType.StringType })
+        ) { backStackEntry ->
+            val mode = backStackEntry.arguments?.getString("mode") ?: "spatial"
+            TestChartGalleryScreen(
+                onSelectChart = { chartType ->
+                    val expId = ExperimentSession.generateExperimentId()
+                    val intent = Intent(context, ModulationDisplayActivity::class.java).apply {
+                        putExtra(ModulationDisplayActivity.EXTRA_CHART_TYPE, chartType.name)
+                        putExtra(ModulationDisplayActivity.EXTRA_EXPERIMENT_ID, expId)
+                        putExtra(ModulationDisplayActivity.EXTRA_MODULATION_MODE, mode)
                     }
                     context.startActivity(intent)
                     refreshExperiments()
