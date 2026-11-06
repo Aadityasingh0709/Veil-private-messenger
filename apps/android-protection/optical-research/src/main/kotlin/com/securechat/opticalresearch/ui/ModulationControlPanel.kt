@@ -344,9 +344,9 @@ private fun TemporalControlsSection(
             )
         }
         Slider(
-            value = temporal.modulationFrequencyHz.toFloat(),
-            onValueChange = { onChange(temporal.copy(modulationFrequencyHz = (it * 10).toInt() / 10.0)) },
-            valueRange = 0.5f..ModulationParams.Temporal.MAX_MODULATION_HZ.toFloat(),
+            value = temporal.modulationFrequencyHz,
+            onValueChange = { onChange(temporal.copy(modulationFrequencyHz = (it * 10).toInt() / 10.0f)) },
+            valueRange = 0.5f..ModulationParams.Temporal.MAX_MODULATION_HZ,
             steps = 24,
             colors = SliderDefaults.colors(thumbColor = LabPrimary, activeTrackColor = LabPrimary)
         )
