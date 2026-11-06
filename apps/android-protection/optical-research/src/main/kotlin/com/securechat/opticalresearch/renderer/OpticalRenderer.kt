@@ -35,21 +35,3 @@ interface OpticalRenderer {
      */
     fun release()
 }
-
-/**
- * Extension interfaces for future Phase 4B experiments.
- * Stubs are explicitly defined here to establish the architectural foundation
- * without prematurely implementing unvalidated modulation algorithms.
- */
-interface SpatialModulationRenderer : OpticalRenderer {
-    var spatialGridFrequencyPx: Int
-    var spatialContrastRatio: Float
-}
-
-interface TemporalModulationRenderer : OpticalRenderer {
-    var modulationFrequencyHz: Float
-    var dutyCycle: Float
-    var emergencyStopTriggered: Boolean
-}
-
-interface CombinedModulationRenderer : SpatialModulationRenderer, TemporalModulationRenderer
