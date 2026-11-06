@@ -76,7 +76,7 @@ fun RenderingDiagnosticsOverlay(
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 Text(
-                    text = "Δt: ${String.format("%.1f", snapshot.meanIntervalMs)}ms",
+                    text = "Δt: ${String.format("%.1f", snapshot.meanFrameIntervalMs)}ms",
                     color = LabTextSecondary,
                     fontSize = 10.sp,
                     fontFamily = FontFamily.Monospace
