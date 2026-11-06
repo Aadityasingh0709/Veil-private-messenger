@@ -56,7 +56,7 @@ class ModulationParamsTest {
     @Test
     fun testTemporalValidationHappyPath() {
         val temporal = ModulationParams.Temporal(
-            modulationFrequencyHz = 2.0,
+            modulationFrequencyHz = 2.0f,
             dutyCycle = 0.5f,
             amplitudeFraction = 0.08f
         )
@@ -68,13 +68,13 @@ class ModulationParamsTest {
     @Test
     fun testTemporalValidationEnforcesWcagCeiling() {
         // Exceeding 3.0 Hz WCAG photosensitivity safety ceiling
-        val unsafeFreq = ModulationParams.Temporal(modulationFrequencyHz = 3.5)
+        val unsafeFreq = ModulationParams.Temporal(modulationFrequencyHz = 3.5f)
         val error = unsafeFreq.validate()
         assertNotNull("Frequencies above 3.0 Hz must be rejected", error)
         assertTrue("Error should mention safety ceiling or WCAG", error!!.contains("3.0") || error.contains("WCAG"))
 
         // Zero or negative frequency
-        val zeroFreq = ModulationParams.Temporal(modulationFrequencyHz = 0.0)
+        val zeroFreq = ModulationParams.Temporal(modulationFrequencyHz = 0.0f)
         assertNotNull(zeroFreq.validate())
 
         // Duty cycle out of bounds
@@ -102,7 +102,7 @@ class ModulationParamsTest {
 
         // Invalid temporal inside combined
         val invalidTemporalInCombined = ModulationParams.Combined(
-            temporal = ModulationParams.Temporal(modulationFrequencyHz = 10.0)
+            temporal = ModulationParams.Temporal(modulationFrequencyHz = 10.0f)
         )
         assertNotNull(invalidTemporalInCombined.validate())
     }
