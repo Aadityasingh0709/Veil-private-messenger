@@ -21,7 +21,7 @@ data class ModulationSessionExtras(
     val gridPeriodPx: Int? = null,
     val contrastRatio: Float? = null,
     val orientationDeg: Float? = null,
-    val modulationFrequencyHz: Double? = null,
+    val modulationFrequencyHz: Float? = null,
     val dutyCycle: Float? = null,
     val amplitudeFraction: Float? = null,
     val diagnosticsSnapshot: RenderingDiagnostics.DiagnosticsSnapshot? = null
