@@ -12,7 +12,7 @@ class ModulationParamsTest {
     fun testBaselineValidationAndDescription() {
         val baseline = ModulationParams.Baseline
         assertNull("Baseline validation should always pass", baseline.validate())
-        assertTrue("Baseline description should mention static", baseline.describe().contains("static", ignoreCase = true))
+        assertTrue("Baseline description should mention baseline", baseline.describe().contains("baseline", ignoreCase = true))
         assertEquals("baseline", ModulationSessionExtras.testModeFromParams(baseline))
     }
 
@@ -61,7 +61,7 @@ class ModulationParamsTest {
             amplitudeFraction = 0.08f
         )
         assertNull("Valid temporal parameters should produce null error", temporal.validate())
-        assertTrue(temporal.describe().contains("2.0 Hz"))
+        assertTrue(temporal.describe().contains("2.0Hz"))
         assertEquals("temporal_modulation", ModulationSessionExtras.testModeFromParams(temporal))
     }
 
