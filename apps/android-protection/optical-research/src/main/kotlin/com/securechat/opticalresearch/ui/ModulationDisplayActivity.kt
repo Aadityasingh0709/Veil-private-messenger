@@ -25,7 +25,6 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import com.securechat.opticalresearch.assets.TestChartGenerator
 import com.securechat.opticalresearch.assets.TestChartType
-import com.securechat.opticalresearch.data.SessionRepository
 import com.securechat.opticalresearch.display.DisplayDiagnosticManager
 import com.securechat.opticalresearch.model.*
 import com.securechat.opticalresearch.renderer.*
@@ -233,7 +232,7 @@ class ModulationDisplayActivity : ComponentActivity() {
         }
 
         if (needsRecreate) {
-            activeRenderer.cleanup()
+            activeRenderer.release()
             activeRenderer = createRenderer(newParams, bmp)
             surfaceView.setRenderer(activeRenderer, bmp)
         } else {
@@ -270,7 +269,7 @@ class ModulationDisplayActivity : ComponentActivity() {
         super.onDestroy()
         persistSessionState()
         window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
-        activeRenderer.cleanup()
+        activeRenderer.release()
         chartBitmap?.recycle()
         chartBitmap = null
     }
