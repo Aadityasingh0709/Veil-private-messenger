@@ -99,6 +99,6 @@ class RenderingDiagnosticsTest {
         assertEquals(0L, after.totalFramesRecorded)
         assertEquals(0L, after.estimatedDroppedFrames)
         assertEquals(0.0, after.recentMeanFps, 0.001)
-        assertEquals(0.0, after.meanIntervalMs, 0.001)
+        assertEquals(0.0, after.meanFrameIntervalMs, 0.001)
     }
 }
