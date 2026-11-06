@@ -306,7 +306,7 @@ class CombinedModulationRenderer(
         }
     }
 
-    override fun cleanup() {
+    override fun release() {
         patternBitmap?.recycle()
         patternBitmap = null
         bitmap = null
