@@ -21,6 +21,7 @@
   --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05);
   --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
   --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
+  --color-bg-viewport: linear-gradient(180deg, #f8fafc 0%, #f1f5f9 100%);
   --radius-sm: 6px;
   --radius-md: 10px;
   --radius-lg: 16px;
@@ -45,6 +46,7 @@
   --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.3);
   --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.4), 0 2px 4px -2px rgb(0 0 0 / 0.3);
   --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.5), 0 4px 6px -4px rgb(0 0 0 / 0.4);
+  --color-bg-viewport: #0b0f19;
 }
 
 [data-theme="dark"] input,
@@ -63,6 +65,59 @@
 [data-theme="dark"] .search-item:hover,
 [data-theme="dark"] .search-item:focus {
   background: var(--color-bg-subtle);
+}
+
+[data-theme="dark"] .search-user-item.selected {
+  background: #1e293b;
+}
+
+[data-theme="dark"] .chat-item-row.selected {
+  background: #1e293b;
+  border-left: 3px solid var(--color-primary);
+}
+
+[data-theme="dark"] .chat-item-row.selected .snippet-prefix {
+  color: var(--color-text-main);
+}
+
+[data-theme="dark"] .messages-viewport {
+  background: var(--color-bg-viewport);
+}
+
+[data-theme="dark"] .chat-thread.empty-thread {
+  background: #0b0f19;
+}
+
+[data-theme="dark"] .bubble-theirs {
+  background: #1e293b;
+  color: #f1f5f9;
+  border: 1px solid #334155;
+}
+
+[data-theme="dark"] .avatar {
+  background: #312e81;
+  color: #c7d2fe;
+}
+
+[data-theme="dark"] .status-badge {
+  border-color: var(--color-bg-surface);
+}
+
+[data-theme="dark"] .auth-container {
+  background: linear-gradient(135deg, #0b0f19 0%, #111827 100%);
+}
+
+[data-theme="dark"] .spinner {
+  border-color: #374151;
+  border-top-color: var(--color-primary);
+}
+
+[data-theme="dark"] .btn-secondary:hover {
+  background: #374151;
+}
+
+[data-theme="dark"] .btn-danger:hover {
+  background: #7f1d1d;
 }
 
 [data-theme="dark"] .message-actions-trigger:hover,
@@ -623,7 +678,7 @@ a:hover {
   display: flex;
   flex-direction: column;
   gap: 12px;
-  background: linear-gradient(180deg, #f8fafc 0%, #f1f5f9 100%);
+  background: var(--color-bg-viewport);
 }
 
 /* Scrollbar styling for smooth, modern UX */

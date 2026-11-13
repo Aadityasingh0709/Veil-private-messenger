@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect, useLayoutEffect, type FormEvent, type KeyboardEvent, type ChangeEvent } from "react";
 import type { Socket } from "socket.io-client";
-import EmojiPickerLibrary from "emoji-picker-react";
+import EmojiPickerLibrary, { Theme } from "emoji-picker-react";
 import { ALLOWED_IMAGE_MIME_TYPES, ALLOWED_VIDEO_MIME_TYPES } from "@secure-chat/shared";
 import { api } from "../api";
 import { ErrorBanner } from "./States";
@@ -191,6 +191,7 @@ export function MessageComposer({ conversationId, socket, onSent }: MessageCompo
         <div className="emoji-picker-popover" ref={emojiPickerRef}>
           <EmojiPickerLibrary
             open
+            theme={typeof document !== "undefined" && document.documentElement.getAttribute("data-theme") === "dark" ? Theme.DARK : Theme.LIGHT}
             onEmojiClick={(selection) => {
               handleEmojiSelect(selection.emoji);
               setEmojiPickerOpen(false);
