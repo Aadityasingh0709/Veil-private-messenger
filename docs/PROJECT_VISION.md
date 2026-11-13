@@ -26,28 +26,44 @@ The platform is designed from the ground up to evolve from a web prototype into 
    - In-app custom media viewer for responsive desktop and mobile media consumption.
    - Message deletion (for me / for everyone) and Unicode emoji messaging.
 
-3. **Phase 3: Digital Capture Protection and Native Android SDK (Current Phase)**
+3. **Phase 3: Digital Capture Protection and Native Android SDK (Completed)**
    - Reusable native Android capture-protection library (`capture-protection`, `.aar`).
    - Operating system-supported secure window functionality (`FLAG_SECURE`).
-   - Testing of system screen recording degradation.
-   - External / non-secure display protection.
+   - Testing of system screen recording degradation and task-switcher censoring.
+   - Non-secure display projection blackouts.
    - Android 14+ screenshot detection callback integration (`registerScreenCaptureCallback`).
    - Interactive capture testing lab and verification demo app (`protection-demo`, `.apk`).
 
-4. **Phase 4: Optical Anti-Capture Research Prototype**
-   - Software-based optical anti-capture rendering attempting to degrade photographs taken with an external physical camera while preserving acceptable human readability.
-   - Spatial and temporal pattern modulation.
+4. **Phase 4A: Optical Anti-Capture Research Lab & Baseline System (Completed)**
+   - Dedicated Android display research application (`:optical-research`).
+   - 7 deterministic synthetic reference test charts with 4-corner bullseye fiducials.
+   - Controlled two-phone physical optical capture protocol ($d = 40.0\text{ cm}$, $\theta = 90^\circ$).
+   - Offline Python computer vision pipeline (subpixel homography, PSNR, SSIM, CIELAB $\Delta E_{00}$).
 
-5. **Phase 5: Advanced Native Android Protection Engine**
-   - High-performance native rendering integration (OpenGL ES / Vulkan / NDK).
+5. **Phase 4B: Spatial & Temporal Display Modulation Lab (Current Phase)**
+   - 6 parameterized spatial modulation patterns (`SpatialPatternMath`).
+   - Choreographer hardware VSYNC-synchronized temporal alternation ($f \le 3.0\text{ Hz}$ WCAG 2.1 compliant).
+   - Combined spatial-temporal modulation with fail-safe Emergency Stop.
+   - Live hardware frame diagnostics overlay and standardized archive manifest export.
+   - Comparative evaluation CLI (`phase4b_analysis.py`) computing edge preservation, text readability, and degradation index.
+
+6. **Phase 5: Advanced Native Android Protection Engine (Planned)**
+   - High-performance native rendering integration (OpenGL ES 3.0 / Vulkan / NDK).
    - Real-time display refresh synchronization.
 
-6. **Phase 6: Protected Media Integration into the Native Messenger**
+7. **Phase 6: Protected Media Integration into the Native Messenger (Planned)**
    - Porting full messaging, authentication, and media workflows into the native Android client.
    - Direct integration of capture protection into media bubbles and viewer.
 
-7. **Phase 7: View-Once and Advanced Privacy Features**
+8. **Phase 7: View-Once and Advanced Privacy Features (Planned)**
    - View-once and expiring media attachments.
+   - Server-side cryptographic shredding and auto-purge timers.
+
+9. **Phase 8: Ambient & Display Condition Tuning (Planned)**
+   - Dynamic parameter tuning based on ambient light lux sensors and panel subpixel layout.
+
+10. **Phase 9: Machine Learning Optimization & Adversarial Tuning (Planned)**
+    - ML-assisted anti-capture parameter optimization and generative adversarial robustness.
    - Ephemeral message lifecycles with server-side purging.
 
 8. **Phase 8: Adaptive Protection**

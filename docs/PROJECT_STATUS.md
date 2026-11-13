@@ -1,8 +1,8 @@
-# Project Status — Phase 3 Implementation
+# Project Status — Phase 4B Implementation & Verification
 
-## Current Phase: PHASE 3 (Digital Capture Protection & Native Android SDK)
+## Current Phase: PHASE 4B (Spatial & Temporal Display Modulation Research)
 
-Phase 3 introduces the first native Android security component for the Private Messenger platform, establishing the foundation for digital capture protection and future optical anti-capture research.
+Phase 4B builds upon the Phase 3 native Android window compositor protection and Phase 4A optical baseline capture system, introducing active display modulation prototypes to counter physical camera captures ("The Analog Hole") while rigorously enforcing WCAG 2.1 photobiological safety standards.
 
 ---
 
@@ -12,8 +12,9 @@ Phase 3 introduces the first native Android security component for the Private M
 |---|---|---|---|
 | **Phase 1** | Core Messaging | **Completed** | Full auth, JWT revocation, MongoDB persistence, Socket.IO real-time text chat |
 | **Phase 2** | Media Messaging & Viewer | **Completed** | Private disk storage, streaming video, custom viewers, message deletion, emoji picker |
-| **Phase 3** | Android Capture Protection SDK | **Current (Implemented)** | Reusable `capture-protection` AAR, `protection-demo` APK, physical QA lab, CI pipeline |
-| **Phase 4** | Optical Anti-Capture Prototype | Planned | Spatial/temporal modulation research against external camera photography |
+| **Phase 3** | Android Capture Protection SDK | **Completed** | Reusable `capture-protection` AAR, `protection-demo` APK, physical QA lab, CI pipeline |
+| **Phase 4A** | Optical Baseline System | **Completed** | Dedicated Android research APK (`:optical-research`), 7 synthetic targets, Python alignment & SSIM/PSNR baseline |
+| **Phase 4B** | Display Modulation Research | **Completed (Audited)** | 6 spatial patterns, Choreographer VSYNC temporal flicker, safety controls, comparative analysis suite |
 | **Phase 5** | Native Android Protection Engine | Planned | OpenGL ES / Vulkan / NDK rendering engine |
 | **Phase 6** | Native Protected Messenger | Planned | Integration of messaging client with native protection SDK |
 | **Phase 7** | View-Once & Ephemeral Media | Planned | Expiring media and server-side auto-purge |

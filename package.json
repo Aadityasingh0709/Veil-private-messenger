@@ -1,5 +1,6 @@
 {
-  "name": "private-messenger-phase-1",
+  "name": "veil-private-messenger",
+  "version": "0.4.2",
   "private": true,
   "workspaces": [
     "apps/*",

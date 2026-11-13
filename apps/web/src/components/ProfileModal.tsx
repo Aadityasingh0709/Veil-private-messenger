@@ -43,15 +43,16 @@ export function ProfileModal({ user, isOpen, onClose, onLogout }: ProfileModalPr
             </div>
             <div className="detail-item">
               <span className="detail-label">Current Phase</span>
-              <span className="detail-value">Phase 1 (Core Web Chat)</span>
+              <span className="detail-value">Phase 4B (Display Modulation & Anti-Capture Research)</span>
             </div>
           </div>
 
           <div className="profile-notice">
-            <strong>About Phase 1:</strong>
+            <strong>About Phase 4B:</strong>
             <p className="muted small">
-              This is the foundational text communication tier. Future phases will introduce
-              secure media viewing, optical anti-capture rendering, and native platform protection.
+              Veil combines real-time messaging, secure media streaming, native Android
+              window compositor capture defense (FLAG_SECURE), and pioneering optical
+              anti-capture display modulation research.
             </p>
           </div>
         </div>
