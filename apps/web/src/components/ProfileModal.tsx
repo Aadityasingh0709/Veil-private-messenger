@@ -5,10 +5,11 @@ interface ProfileModalProps {
   user: AccountUser;
   isOpen: boolean;
   onClose: () => void;
+  onOpenFeatures?: () => void;
   onLogout: () => void;
 }
 
-export function ProfileModal({ user, isOpen, onClose, onLogout }: ProfileModalProps) {
+export function ProfileModal({ user, isOpen, onClose, onOpenFeatures, onLogout }: ProfileModalProps) {
   if (!isOpen) return null;
 
   return (
@@ -54,6 +55,19 @@ export function ProfileModal({ user, isOpen, onClose, onLogout }: ProfileModalPr
               window compositor capture defense (FLAG_SECURE), and pioneering optical
               anti-capture display modulation research.
             </p>
+            {onOpenFeatures && (
+              <button
+                type="button"
+                className="btn-secondary"
+                style={{ marginTop: "10px", width: "100%", fontSize: "12px", padding: "6px 10px" }}
+                onClick={() => {
+                  onClose();
+                  onOpenFeatures();
+                }}
+              >
+                🛡️ Open Capabilities & Security Hub →
+              </button>
+            )}
           </div>
         </div>
 

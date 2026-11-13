@@ -1404,3 +1404,184 @@ a:hover {
 .hidden {
   display: none !important;
 }
+
+/* ==========================================================================
+   Features & Capabilities Hub Modal
+   ========================================================================== */
+.features-modal-card {
+  max-width: 640px;
+  max-height: 88vh;
+}
+
+.features-modal-header-titles {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.features-badge-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.badge-phase {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 8px;
+  background: rgba(59, 130, 246, 0.12);
+  color: var(--color-primary);
+  font-size: 11px;
+  font-weight: 700;
+  border-radius: var(--radius-sm);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.features-tabs {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 8px 18px;
+  border-bottom: 1px solid var(--color-border);
+  background: var(--color-bg-subtle);
+  overflow-x: auto;
+}
+
+.features-tab-btn {
+  padding: 8px 14px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--color-text-muted);
+  border-radius: var(--radius-md);
+  white-space: nowrap;
+  transition: all 0.15s ease;
+}
+
+.features-tab-btn:hover {
+  color: var(--color-text-main);
+  background: rgba(127, 127, 127, 0.1);
+}
+
+.features-tab-btn.active {
+  color: var(--color-primary);
+  background: var(--color-bg-surface);
+  box-shadow: var(--shadow-sm);
+}
+
+.features-modal-body {
+  padding: 20px 24px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.features-section h4 {
+  font-size: 16px;
+  font-weight: 700;
+  margin-bottom: 6px;
+}
+
+.features-hero-box {
+  padding: 14px 16px;
+  background: var(--color-bg-subtle);
+  border-radius: var(--radius-md);
+  border-left: 4px solid var(--color-primary);
+  margin-bottom: 16px;
+}
+
+.features-hero-box h4 {
+  margin-bottom: 4px;
+}
+
+.security-telemetry-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.telemetry-card {
+  padding: 12px 14px;
+  background: var(--color-bg-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.telemetry-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.status-pill {
+  align-self: flex-start;
+  padding: 2px 8px;
+  border-radius: 9999px;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.pill-active {
+  background: rgba(16, 185, 129, 0.15);
+  color: var(--color-online);
+}
+
+.features-roadmap-summary h5 {
+  font-size: 13px;
+  font-weight: 700;
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+  margin-bottom: 8px;
+  letter-spacing: 0.04em;
+}
+
+.features-list {
+  padding-left: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.feature-cards-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 12px;
+}
+
+.feature-card {
+  padding: 12px 14px;
+  background: var(--color-bg-subtle);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--color-border-subtle);
+}
+
+.sdk-code-snippet {
+  margin-top: 14px;
+  background: #0f172a;
+  color: #38bdf8;
+  padding: 12px 14px;
+  border-radius: var(--radius-md);
+  font-family: monospace;
+  font-size: 12px;
+  line-height: 1.6;
+  white-space: pre-wrap;
+}
+
+.test-charts-mini-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.test-chart-mini-item {
+  padding: 8px 10px;
+  background: var(--color-bg-subtle);
+  border-radius: var(--radius-sm);
+  font-size: 13px;
+}

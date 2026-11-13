@@ -12,6 +12,7 @@ import { MessageBubble } from "./components/MessageBubble";
 import { MessageComposer, TypingIndicator } from "./components/MessageComposer";
 import { MediaViewer } from "./components/MediaViewer";
 import { ProfileModal } from "./components/ProfileModal";
+import { FeaturesModal } from "./components/FeaturesModal";
 import { EmptyState, ErrorBanner, LoadingSpinner } from "./components/States";
 
 function ChatApp() {
@@ -23,6 +24,7 @@ function ChatApp() {
   const [typing, setTyping] = useState(false);
   const [error, setError] = useState("");
   const [profileOpen, setProfileOpen] = useState(false);
+  const [featuresOpen, setFeaturesOpen] = useState(false);
   const [loading, setLoading] = useState(true);
 
   // Theme State (Dark / Light mode with persistence)
@@ -275,6 +277,7 @@ function ChatApp() {
           currentUser={me}
           theme={theme}
           onToggleTheme={handleToggleTheme}
+          onOpenFeatures={() => setFeaturesOpen(true)}
           onOpenProfile={() => setProfileOpen(true)}
           onLogout={handleLogout}
         />
@@ -362,7 +365,14 @@ function ChatApp() {
         user={me}
         isOpen={profileOpen}
         onClose={() => setProfileOpen(false)}
+        onOpenFeatures={() => setFeaturesOpen(true)}
         onLogout={handleLogout}
+      />
+
+      {/* Veil Capabilities & Security Hub Modal */}
+      <FeaturesModal
+        isOpen={featuresOpen}
+        onClose={() => setFeaturesOpen(false)}
       />
 
       {/* Custom Media Viewer Modal */}

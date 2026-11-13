@@ -5,6 +5,7 @@ interface NavigationProps {
   currentUser: PublicUser;
   theme: "light" | "dark";
   onToggleTheme: () => void;
+  onOpenFeatures: () => void;
   onOpenProfile: () => void;
   onLogout: () => void;
 }
@@ -13,6 +14,7 @@ export function Navigation({
   currentUser,
   theme,
   onToggleTheme,
+  onOpenFeatures,
   onOpenProfile,
   onLogout
 }: NavigationProps) {
@@ -35,6 +37,15 @@ export function Navigation({
           aria-label={theme === "dark" ? "Switch to light mode" : "Switch to dark mode"}
         >
           {theme === "dark" ? "☀️" : "🌙"}
+        </button>
+        <button
+          type="button"
+          className="btn-icon"
+          onClick={onOpenFeatures}
+          title="Veil Capabilities & Security Hub (Phase 4B)"
+          aria-label="Capabilities Hub"
+        >
+          🛡️
         </button>
         <button
           type="button"
