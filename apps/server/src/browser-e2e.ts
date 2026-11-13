@@ -124,10 +124,14 @@ async function runBrowserTests() {
     const emojiResult = pageA.locator('.EmojiPickerReact button[aria-label="grinning face"]').first();
     await emojiResult.waitFor({ state: "visible", timeout: 5000 });
     await emojiResult.click();
+    await pageA.waitForFunction(() => {
+      const input = document.querySelector('.composer-input') as HTMLInputElement | null;
+      return input && input.value === "Keep 😀this text" && input.selectionStart === 7;
+    }, { timeout: 4000 }).catch(() => {});
     const insertedText = await composerInput.inputValue();
     const insertedCaret = await composerInput.evaluate((input: HTMLInputElement) => input.selectionStart);
     if (insertedText !== "Keep 😀this text" || insertedCaret !== 7) {
-      throw new Error(`Emoji insertion did not preserve the unsent text or cursor position (got "${insertedText}")`);
+      throw new Error(`Emoji insertion did not preserve the unsent text or cursor position (got "${insertedText}", caret ${insertedCaret})`);
     }
     await pageA.locator(".btn-emoji").click();
     await pageA.getByRole("textbox", { name: "Search emojis" }).fill("");

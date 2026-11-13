@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, type FormEvent, type KeyboardEvent, type ChangeEvent } from "react";
+import { useState, useRef, useEffect, useLayoutEffect, type FormEvent, type KeyboardEvent, type ChangeEvent } from "react";
 import type { Socket } from "socket.io-client";
 import EmojiPickerLibrary from "emoji-picker-react";
 import { ALLOWED_IMAGE_MIME_TYPES, ALLOWED_VIDEO_MIME_TYPES } from "@secure-chat/shared";
@@ -26,8 +26,18 @@ export function MessageComposer({ conversationId, socket, onSent }: MessageCompo
   const messageInputRef = useRef<HTMLInputElement>(null);
   const emojiPickerRef = useRef<HTMLDivElement>(null);
   const selectionRangeRef = useRef({ start: 0, end: 0 });
+  const pendingCaretRef = useRef<number | null>(null);
   const typingTimer = useRef<number>();
   const [emojiPickerOpen, setEmojiPickerOpen] = useState(false);
+
+  useLayoutEffect(() => {
+    if (pendingCaretRef.current !== null && messageInputRef.current) {
+      const caret = pendingCaretRef.current;
+      messageInputRef.current.focus();
+      messageInputRef.current.setSelectionRange(caret, caret);
+      pendingCaretRef.current = null;
+    }
+  }, [text]);
 
   useEffect(() => {
     if (!emojiPickerOpen) return;
@@ -155,11 +165,23 @@ export function MessageComposer({ conversationId, socket, onSent }: MessageCompo
     const start = Math.min(selectionRangeRef.current.start, text.length);
     const end = Math.min(selectionRangeRef.current.end, text.length);
     const nextText = `${text.slice(0, start)}${emoji}${text.slice(end)}`;
+    const nextCaret = start + emoji.length;
+
+    pendingCaretRef.current = nextCaret;
+    selectionRangeRef.current = { start: nextCaret, end: nextCaret };
     handleChange(nextText);
-    selectionRangeRef.current = { start: start + emoji.length, end: start + emoji.length };
+
+    if (input) {
+      input.value = nextText;
+      input.focus();
+      input.setSelectionRange(nextCaret, nextCaret);
+    }
+
     window.requestAnimationFrame(() => {
-      input?.focus();
-      input?.setSelectionRange(start + emoji.length, start + emoji.length);
+      if (input) {
+        input.focus();
+        input.setSelectionRange(nextCaret, nextCaret);
+      }
     });
   };
 
