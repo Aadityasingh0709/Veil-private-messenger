@@ -25,7 +25,8 @@ import com.securechat.opticalresearch.ui.theme.*
  *
  * Provides researcher controls for real-time modulation parameter adjustment:
  * - Mode selection: Baseline, Spatial, Temporal, Combined
- * - Spatial controls: pattern geometry, grid period px, contrast ratio (capped at 15%), orientation
+ * - Spatial controls: effect toggle (Normal Mode vs Spatial Mode), pattern geometry,
+ *   grid period px, contrast ratio (capped at 15%), orientation
  * - Temporal controls: frequency (0.5–3.0 Hz, capped at 3.0 Hz WCAG ceiling), duty cycle, amplitude (capped at 15%)
  * - Prominent emergency STOP control
  * - Real-time validation warning display
@@ -36,7 +37,9 @@ fun ModulationControlPanel(
     params: ModulationParams,
     onParamsChange: (ModulationParams) -> Unit,
     onEmergencyStop: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    isEffectEnabled: Boolean = true,
+    onToggleEffect: (Boolean) -> Unit = {}
 ) {
     val scrollState = rememberScrollState()
     val validationError = params.validate()
@@ -69,7 +72,7 @@ fun ModulationControlPanel(
                         letterSpacing = 1.sp
                     )
                     Text(
-                        text = "Phase 4B Parameter Suite",
+                        text = "Phase 4B.1 Parameter Suite",
                         color = LabTextSecondary,
                         fontSize = 11.sp
                     )
@@ -124,7 +127,7 @@ fun ModulationControlPanel(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(6.dp)
             ) {
-                val modes = listOf("Static" to 0, "Spatial" to 1, "Temporal" to 2, "Combined" to 3)
+                val modes = listOf("Normal" to 0, "Spatial" to 1, "Temporal" to 2, "Combined" to 3)
                 val currentModeIndex = when (params) {
                     is ModulationParams.Baseline -> 0
                     is ModulationParams.Spatial -> 1
@@ -165,13 +168,52 @@ fun ModulationControlPanel(
             when (params) {
                 is ModulationParams.Baseline -> {
                     Text(
-                        text = "Static baseline rendering active. No spatial or temporal perturbation applied.",
+                        text = "Normal baseline mode active. Displays unmodified reference test chart with zero modulation.",
                         color = LabTextSecondary,
                         fontSize = 12.sp
                     )
                 }
 
                 is ModulationParams.Spatial -> {
+                    // Effect Enable/Disable Toggle
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = CardDefaults.cardColors(containerColor = LabDarkCard),
+                        shape = RoundedCornerShape(8.dp)
+                    ) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(12.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    text = if (isEffectEnabled) "Spatial Modulation: ACTIVE" else "Normal Display Mode (OFF)",
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 12.sp,
+                                    color = if (isEffectEnabled) LabSuccess else LabTextSecondary
+                                )
+                                Text(
+                                    text = if (isEffectEnabled) "Static spatial perturbation overlaid" else "Showing unmodified baseline chart",
+                                    fontSize = 11.sp,
+                                    color = LabTextSecondary
+                                )
+                            }
+                            Switch(
+                                checked = isEffectEnabled,
+                                onCheckedChange = onToggleEffect,
+                                colors = SwitchDefaults.colors(
+                                    checkedThumbColor = LabSuccess,
+                                    checkedTrackColor = LabSuccess.copy(alpha = 0.4f),
+                                    uncheckedThumbColor = Color.Gray,
+                                    uncheckedTrackColor = LabDarkSurface
+                                )
+                            )
+                        }
+                    }
+
                     SpatialControlsSection(
                         spatial = params,
                         onChange = { onParamsChange(it) }
@@ -274,7 +316,7 @@ private fun SpatialControlsSection(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween
         ) {
-            Text("Period:", color = LabTextPrimary, fontSize = 12.sp)
+            Text("Grid Period (2–64px):", color = LabTextPrimary, fontSize = 12.sp)
             Text("${spatial.gridPeriodPx} px", color = LabPrimary, fontSize = 12.sp, fontFamily = FontFamily.Monospace)
         }
         Slider(

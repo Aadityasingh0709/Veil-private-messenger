@@ -6,7 +6,7 @@ import com.google.gson.annotations.SerializedName
 
 /**
  * Standardized manifest structure serialized to manifest.json in exported research archives.
- * Conforms 100% to research/optical-capture/python/schemas/manifest.schema.json.
+ * Conforms 100% to research/optical-capture/python/schemas/phase4b_manifest.schema.json and manifest.schema.json.
  */
 data class ExperimentManifest(
     @SerializedName("schemaVersion")
@@ -30,6 +30,12 @@ data class ExperimentManifest(
     @SerializedName("phoneB")
     val phoneB: PhoneBCaptureInfo,
 
+    @SerializedName("modulationParams")
+    val modulationParams: ModulationManifestParams? = null,
+
+    @SerializedName("renderingDiagnostics")
+    val renderingDiagnostics: RenderingDiagnosticsManifest? = null,
+
     @SerializedName("captures")
     val captures: List<CaptureManifestItem>,
 
@@ -48,6 +54,31 @@ data class ExperimentManifest(
         }
 
         fun fromSession(session: ExperimentSession): ExperimentManifest {
+            val extras = ModulationSessionExtras.extractFromNotes(session.notes)
+            val modParams = extras?.let { e ->
+                ModulationManifestParams(
+                    modulationType = e.modulationType,
+                    spatialPattern = e.spatialPattern,
+                    gridPeriodPx = e.gridPeriodPx,
+                    contrastRatio = e.contrastRatio,
+                    orientationDeg = e.orientationDeg,
+                    modulationFrequencyHz = e.modulationFrequencyHz,
+                    dutyCycle = e.dutyCycle,
+                    amplitudeFraction = e.amplitudeFraction
+                )
+            }
+
+            val renderingDiag = extras?.diagnosticsSnapshot?.let { d ->
+                RenderingDiagnosticsManifest(
+                    totalFramesRecorded = d.totalFramesRecorded,
+                    meanIntervalMs = d.meanFrameIntervalMs,
+                    recentMeanFps = d.recentMeanFps,
+                    estimatedDroppedFrames = d.estimatedDroppedFrames,
+                    minIntervalMs = d.minFrameIntervalMs,
+                    maxIntervalMs = d.maxFrameIntervalMs
+                )
+            }
+
             return ExperimentManifest(
                 schemaVersion = "1.0.0",
                 experimentId = session.experimentId,
@@ -61,6 +92,8 @@ data class ExperimentManifest(
                 ),
                 phoneA = session.phoneA,
                 phoneB = session.phoneB,
+                modulationParams = modParams,
+                renderingDiagnostics = renderingDiag,
                 captures = session.captures.map { c ->
                     CaptureManifestItem(
                         filename = c.filename,
@@ -89,4 +122,24 @@ data class CaptureManifestItem(
     @SerializedName("repetitionNumber") val repetitionNumber: Int,
     @SerializedName("timestamp") val timestamp: String?,
     @SerializedName("exif") val exif: ExifMetadata?
+)
+
+data class ModulationManifestParams(
+    @SerializedName("modulationType") val modulationType: String,
+    @SerializedName("spatialPattern") val spatialPattern: String? = null,
+    @SerializedName("gridPeriodPx") val gridPeriodPx: Int? = null,
+    @SerializedName("contrastRatio") val contrastRatio: Float? = null,
+    @SerializedName("orientationDeg") val orientationDeg: Float? = null,
+    @SerializedName("modulationFrequencyHz") val modulationFrequencyHz: Float? = null,
+    @SerializedName("dutyCycle") val dutyCycle: Float? = null,
+    @SerializedName("amplitudeFraction") val amplitudeFraction: Float? = null
+)
+
+data class RenderingDiagnosticsManifest(
+    @SerializedName("totalFramesRecorded") val totalFramesRecorded: Long,
+    @SerializedName("meanIntervalMs") val meanIntervalMs: Double,
+    @SerializedName("recentMeanFps") val recentMeanFps: Double,
+    @SerializedName("estimatedDroppedFrames") val estimatedDroppedFrames: Long,
+    @SerializedName("minIntervalMs") val minIntervalMs: Double,
+    @SerializedName("maxIntervalMs") val maxIntervalMs: Double
 )

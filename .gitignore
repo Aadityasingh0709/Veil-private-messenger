@@ -45,3 +45,6 @@ __pycache__/
 **/.pytest_cache/
 research/optical-capture/experiments/
 research/optical-capture/reports/
+Veil_Phase4A_Agent_Input/
+Veil_Phase4A_Original_Experiments/
+Veil_Phase4A_Research_Summary/

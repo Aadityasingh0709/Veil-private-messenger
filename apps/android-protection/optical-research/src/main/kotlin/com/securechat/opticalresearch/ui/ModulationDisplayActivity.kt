@@ -58,6 +58,7 @@ class ModulationDisplayActivity : ComponentActivity() {
 
     private val diagnostics = RenderingDiagnostics()
     private var currentParams: ModulationParams = ModulationParams.Spatial()
+    private var isEffectEnabled: Boolean = true
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -93,11 +94,11 @@ class ModulationDisplayActivity : ComponentActivity() {
         // Initialize session in repository
         val displayManager = DisplayDiagnosticManager(this)
         val phoneAInfo = displayManager.queryCurrentDisplayInfo()
-        val initialTestMode = ModulationSessionExtras.testModeFromParams(currentParams)
+        val initialTestMode = ModulationSessionExtras.testModeFromParams(currentParams, isEffectEnabled)
 
         val existingSession = repository.getSession(currentExperimentId)
         if (existingSession == null) {
-            val extras = ModulationSessionExtras.from(currentParams)
+            val extras = ModulationSessionExtras.from(currentParams, isEffectEnabled = isEffectEnabled)
             val newSession = ExperimentSession(
                 experimentId = currentExperimentId,
                 testMode = initialTestMode,
@@ -122,6 +123,7 @@ class ModulationDisplayActivity : ComponentActivity() {
 
         setContent {
             var paramsState by remember { mutableStateOf(currentParams) }
+            var effectEnabledState by remember { mutableStateOf(isEffectEnabled) }
             var isPanelOpen by remember { mutableStateOf(false) }
 
             Box(modifier = Modifier.fillMaxSize()) {
@@ -199,6 +201,13 @@ class ModulationDisplayActivity : ComponentActivity() {
                 ) {
                     ModulationControlPanel(
                         params = paramsState,
+                        isEffectEnabled = effectEnabledState,
+                        onToggleEffect = { enabled ->
+                            effectEnabledState = enabled
+                            isEffectEnabled = enabled
+                            (activeRenderer as? SpatialModulationRenderer)?.isEffectEnabled = enabled
+                            persistSessionState()
+                        },
                         onParamsChange = { newParams ->
                             paramsState = newParams
                             currentParams = newParams
@@ -206,6 +215,8 @@ class ModulationDisplayActivity : ComponentActivity() {
                         },
                         onEmergencyStop = {
                             triggerEmergencyStop()
+                            effectEnabledState = false
+                            isEffectEnabled = false
                         }
                     )
                 }
@@ -215,7 +226,11 @@ class ModulationDisplayActivity : ComponentActivity() {
 
     private fun createRenderer(params: ModulationParams, bmp: Bitmap): OpticalRenderer {
         return when (params) {
-            is ModulationParams.Spatial -> SpatialModulationRenderer(currentExperimentId, params)
+            is ModulationParams.Spatial -> {
+                SpatialModulationRenderer(currentExperimentId, params).apply {
+                    isEffectEnabled = this@ModulationDisplayActivity.isEffectEnabled
+                }
+            }
             is ModulationParams.Temporal -> TemporalModulationRenderer(currentExperimentId, params, diagnostics)
             is ModulationParams.Combined -> CombinedModulationRenderer(currentExperimentId, params, diagnostics)
             is ModulationParams.Baseline -> NormalBaselineRenderer(currentExperimentId)
@@ -237,26 +252,34 @@ class ModulationDisplayActivity : ComponentActivity() {
             surfaceView.setRenderer(activeRenderer, bmp)
         } else {
             when (val r = activeRenderer) {
-                is SpatialModulationRenderer -> (newParams as? ModulationParams.Spatial)?.let { r.updateParams(it) }
+                is SpatialModulationRenderer -> {
+                    (newParams as? ModulationParams.Spatial)?.let {
+                        r.updateParams(it)
+                        r.isEffectEnabled = isEffectEnabled
+                    }
+                }
                 is TemporalModulationRenderer -> (newParams as? ModulationParams.Temporal)?.let { r.updateParams(it) }
                 is CombinedModulationRenderer -> (newParams as? ModulationParams.Combined)?.let { r.updateParams(it) }
                 else -> Unit
             }
         }
+        persistSessionState()
     }
 
     private fun triggerEmergencyStop() {
         when (val r = activeRenderer) {
+            is SpatialModulationRenderer -> r.stopModulation()
             is TemporalModulationRenderer -> r.emergencyStop = true
             is CombinedModulationRenderer -> r.emergencyStop = true
             else -> Unit
         }
+        persistSessionState()
     }
 
     private fun persistSessionState() {
         val existingSession = repository.getSession(currentExperimentId) ?: return
-        val testMode = ModulationSessionExtras.testModeFromParams(currentParams)
-        val extras = ModulationSessionExtras.from(currentParams, diagnostics.snapshot())
+        val testMode = ModulationSessionExtras.testModeFromParams(currentParams, isEffectEnabled)
+        val extras = ModulationSessionExtras.from(currentParams, diagnostics.snapshot(), isEffectEnabled)
         val updatedNotes = ModulationSessionExtras.embedInNotes(existingSession.notes, extras)
         val updatedSession = existingSession.copy(
             testMode = testMode,

@@ -6,40 +6,55 @@ import android.graphics.Color
 import android.graphics.Matrix
 import android.graphics.Paint
 import android.graphics.PorterDuff
-import android.graphics.PorterDuffXfermode
 import android.graphics.Rect
 import android.graphics.RectF
 import com.securechat.opticalresearch.model.ModulationParams
 import com.securechat.opticalresearch.model.SpatialPatternType
 import kotlin.math.PI
 import kotlin.math.abs
-import kotlin.math.cos
 import kotlin.math.sin
 
 /**
- * Phase 4B — Mode 1: Spatial Modulation Renderer.
+ * Phase 4B.1 — Spatial Modulation Prototype Renderer.
  *
- * Renders the reference image with a controlled, deterministic spatial luminance
- * perturbation overlaid using alpha compositing. The perturbation pattern is fully
- * parameterized via [ModulationParams.Spatial].
- *
- * Design decisions:
- * - Pattern is rendered to a recycled off-screen [Bitmap] once per configuration change,
- *   then composited at render time using [PorterDuff.Mode.SRC_OVER] with per-pixel alpha.
- * - No random seed; patterns are purely deterministic given width, height, and params.
- * - Modulation is additive/subtractive luminance perturbation, not color shift.
- * - Spatial patterns do NOT flash or change over time — that is [TemporalModulationRenderer]'s domain.
- * - Safety: contrast is capped at [ModulationParams.Spatial.MAX_CONTRAST_RATIO].
- *
- * Implements [SpatialModulationRenderer] from OpticalRenderer.kt.
+ * Presents the reference test chart with an opt-in, controlled, static spatial luminance
+ * perturbation pattern overlaid using alpha compositing:
+ * - Deterministic, parameter-driven pattern generation (6 geometric patterns).
+ * - Aspect-ratio-preserving fit center calculation (delegated to [SpatialPatternMath]).
+ * - User toggle: switch between Normal baseline mode and Spatial Modulation mode.
+ * - Strict conservative intensity bounds (contrast capped at [ModulationParams.Spatial.MAX_CONTRAST_RATIO] = 15%).
+ * - Zero temporal flicker, zero aggressive brightness shifts, zero ML dependencies.
+ * - Emergency stop control halts all modulation immediately.
+ * - Preserves modularity so temporal and combined modulation can be built alongside.
+ * - Purely experimental: makes no claims of camera degradation prior to physical experimentation.
  */
 class SpatialModulationRenderer(
     private val experimentId: String,
     private var params: ModulationParams.Spatial = ModulationParams.Spatial()
 ) : OpticalRenderer {
 
-    override val modeName: String = "Spatial Modulation (Phase 4B)"
-    override val isModulationActive: Boolean = true
+    override val modeName: String = "Spatial Modulation (Phase 4B.1 Prototype)"
+
+    /**
+     * True only when the effect is user-enabled and emergency stop has not been triggered.
+     * When false, the renderer presents the reference image in unmodified Normal baseline mode.
+     */
+    override val isModulationActive: Boolean
+        get() = isEffectEnabled && !emergencyStop
+
+    /**
+     * User control to enable or disable the spatial modulation overlay.
+     * Toggling this allows immediate comparison between Normal baseline and Spatial mode.
+     */
+    @Volatile
+    var isEffectEnabled: Boolean = true
+
+    /**
+     * Fail-safe emergency stop control.
+     * When set, immediately halts modulation and reverts display to static baseline.
+     */
+    @Volatile
+    var emergencyStop: Boolean = false
 
     private var bitmap: Bitmap? = null
     private var surfaceWidth: Int = 0
@@ -51,31 +66,72 @@ class SpatialModulationRenderer(
     private val marginPx = 60f
     private val markerRadiusPx = 36f
 
-    // Pre-allocated paints
-    private val bgPaint = Paint().apply { color = Color.rgb(245, 245, 245); style = Paint.Style.FILL }
-    private val framePaint = Paint().apply { color = Color.BLACK; style = Paint.Style.STROKE; strokeWidth = 3f; isAntiAlias = true }
-    private val bitmapPaint = Paint(Paint.FILTER_BITMAP_FLAG)
-    private val markerBlack = Paint().apply { color = Color.BLACK; style = Paint.Style.FILL; isAntiAlias = true }
-    private val markerWhite = Paint().apply { color = Color.WHITE; style = Paint.Style.FILL; isAntiAlias = true }
-    private val textPaint = Paint().apply {
-        color = Color.rgb(100, 220, 100)
-        textSize = 26f; isAntiAlias = true; typeface = android.graphics.Typeface.MONOSPACE
+    // Pre-allocated paints (initialized lazily to avoid Android framework calls in JVM tests)
+    private val bgPaint by lazy { Paint().apply { color = 0xFFF5F5F5.toInt(); style = Paint.Style.FILL } }
+    private val framePaint by lazy { Paint().apply { color = Color.BLACK; style = Paint.Style.STROKE; strokeWidth = 3f; isAntiAlias = true } }
+    private val bitmapPaint by lazy { Paint(Paint.FILTER_BITMAP_FLAG) }
+    private val markerBlack by lazy { Paint().apply { color = Color.BLACK; style = Paint.Style.FILL; isAntiAlias = true } }
+    private val markerWhite by lazy { Paint().apply { color = Color.WHITE; style = Paint.Style.FILL; isAntiAlias = true } }
+    private val textPaint by lazy {
+        Paint().apply {
+            color = 0xFF64DC64.toInt()
+            textSize = 26f
+            isAntiAlias = true
+            typeface = android.graphics.Typeface.MONOSPACE
+        }
+    }
+    private val stopTextPaint by lazy {
+        Paint().apply {
+            color = 0xFFFF5050.toInt()
+            textSize = 28f
+            isAntiAlias = true
+            typeface = android.graphics.Typeface.MONOSPACE
+        }
+    }
+    private val disabledTextPaint by lazy {
+        Paint().apply {
+            color = 0xFFA0A0A0.toInt()
+            textSize = 26f
+            isAntiAlias = true
+            typeface = android.graphics.Typeface.MONOSPACE
+        }
     }
 
-    // Off-screen pattern bitmap (recycled on param change)
+    // Off-screen pattern bitmap (recycled on param or dimension change)
     private var patternBitmap: Bitmap? = null
-    private var patternCanvas: Canvas? = null
-    private val patternPaint = Paint().apply {
-        isAntiAlias = false
-        // The pattern is composed using SRC_OVER at reduced alpha; alpha is baked into pixels.
+    private val patternPaint by lazy {
+        Paint().apply {
+            isAntiAlias = false
+        }
     }
 
-    /** Update parameters mid-session. Triggers pattern regeneration on next initialize. */
+    /** Returns the currently active spatial parameters. */
+    fun getParams(): ModulationParams.Spatial = params
+
+    /**
+     * Updates spatial parameters mid-session.
+     * Triggers pattern bitmap regeneration if surface dimensions are initialized.
+     */
     fun updateParams(newParams: ModulationParams.Spatial) {
         params = newParams
-        // Pattern will be regenerated in renderFrame by checking dimensions
         patternBitmap?.recycle()
         patternBitmap = null
+        if (surfaceWidth > 0 && surfaceHeight > 0) {
+            buildPatternBitmap(surfaceWidth, surfaceHeight)
+        }
+    }
+
+
+    /** Triggers immediate stop, halting modulation overlay. */
+    fun stopModulation() {
+        emergencyStop = true
+        isEffectEnabled = false
+    }
+
+    /** Restores modulation after an emergency stop or disable action. */
+    fun restoreModulation() {
+        emergencyStop = false
+        isEffectEnabled = true
     }
 
     override fun initialize(referenceBitmap: Bitmap, width: Int, height: Int) {
@@ -85,25 +141,18 @@ class SpatialModulationRenderer(
 
         srcRect.set(0, 0, referenceBitmap.width, referenceBitmap.height)
 
-        val availWidth = width - marginPx * 2
-        val availHeight = height - marginPx * 2 - 80f
+        // Compute aspect-ratio-preserving destination rectangle
+        val fit = SpatialPatternMath.calculateFitCenterRect(
+            imageWidth = referenceBitmap.width,
+            imageHeight = referenceBitmap.height,
+            surfaceWidth = width,
+            surfaceHeight = height,
+            marginPx = marginPx,
+            reservedVerticalPx = 80f
+        )
+        dstRect.set(fit.left, fit.top, fit.right, fit.bottom)
 
-        val imgAspect = referenceBitmap.width.toFloat() / referenceBitmap.height
-        val availAspect = availWidth / availHeight
-
-        val drawWidth: Float
-        val drawHeight: Float
-        if (imgAspect > availAspect) {
-            drawWidth = availWidth; drawHeight = availWidth / imgAspect
-        } else {
-            drawHeight = availHeight; drawWidth = availHeight * imgAspect
-        }
-
-        val left = marginPx + (availWidth - drawWidth) / 2f
-        val top = marginPx + 40f + (availHeight - drawHeight) / 2f
-        dstRect.set(left, top, left + drawWidth, top + drawHeight)
-
-        // Build pattern bitmap
+        // Pre-render pattern bitmap
         buildPatternBitmap(width, height)
     }
 
@@ -172,11 +221,11 @@ class SpatialModulationRenderer(
             }
 
             SpatialPatternType.RADIAL_GRID -> {
-                // Concentric circle rings spaced by period
                 p.color = darkenColor
                 p.style = Paint.Style.STROKE
                 p.strokeWidth = (period / 2).toFloat()
-                val cx = w / 2f; val cy = h / 2f
+                val cx = w / 2f
+                val cy = h / 2f
                 val maxR = kotlin.math.sqrt((cx * cx + cy * cy).toDouble()).toFloat()
                 var r = period.toFloat()
                 while (r < maxR) {
@@ -186,55 +235,68 @@ class SpatialModulationRenderer(
             }
 
             SpatialPatternType.SINE_WAVE -> {
-                // Horizontal sine-wave luminance modulation: each row gets a brightness shift
-                // proportional to sin(2π * row / period)
                 for (row in 0 until h) {
                     val sinVal = sin(2.0 * PI * row / period).toFloat()
                     val alpha = (abs(sinVal) * darkenAlpha).toInt()
                     val lineColor = if (sinVal >= 0f) Color.argb(alpha, 0, 0, 0)
-                                    else Color.argb(alpha, 255, 255, 255)
+                    else Color.argb(alpha, 255, 255, 255)
                     p.color = lineColor
                     canvas.drawLine(0f, row.toFloat(), w.toFloat(), row.toFloat(), p)
                 }
             }
         }
 
-        // If orientation != 0, rotate the pattern bitmap
+        // Apply rotation matrix if orientationDeg != 0
         val finalBmp = if (params.orientationDeg != 0f) {
             val matrix = Matrix()
             matrix.postRotate(params.orientationDeg, w / 2f, h / 2f)
             val rotated = Bitmap.createBitmap(bmp, 0, 0, w, h, matrix, true)
             bmp.recycle()
             rotated
-        } else bmp
+        } else {
+            bmp
+        }
 
         patternBitmap = finalBmp
-        patternCanvas = Canvas(finalBmp)
     }
 
     override fun render(canvas: Canvas, frameTimeNanos: Long) {
+        // Clear background with neutral laboratory gray
         canvas.drawRect(0f, 0f, surfaceWidth.toFloat(), surfaceHeight.toFloat(), bgPaint)
 
-        // 1. Reference bitmap
+        // 1. Draw underlying reference image preserving native aspect ratio
         bitmap?.let { canvas.drawBitmap(it, srcRect, dstRect, bitmapPaint) }
 
-        // 2. Spatial pattern overlay (clipped to image destination rect)
-        canvas.save()
-        canvas.clipRect(dstRect)
-        patternBitmap?.let { canvas.drawBitmap(it, 0f, 0f, patternPaint) }
-        canvas.restore()
+        // 2. Controlled spatial perturbation overlay (drawn ONLY when modulation is active)
+        if (isModulationActive) {
+            canvas.save()
+            canvas.clipRect(dstRect)
+            patternBitmap?.let { canvas.drawBitmap(it, 0f, 0f, patternPaint) }
+            canvas.restore()
+        }
 
-        // 3. Calibration frame
+        // 3. Calibration frame connecting corner fiducials
         canvas.drawRect(marginPx, marginPx, surfaceWidth - marginPx, surfaceHeight - marginPx, framePaint)
 
-        // 4. Corner fiducials
+        // 4. Corner fiducials for homography perspective correction
         drawFiducials(canvas)
 
-        // 5. Mode/params overlay
-        canvas.drawText(
-            "SPATIAL • ${params.patternType.displayLabel} • ${params.gridPeriodPx}px • ${(params.contrastRatio * 100).toInt()}%",
-            marginPx + 16f, marginPx + 30f, textPaint
-        )
+        // 5. HUD Status & Parameters text
+        when {
+            emergencyStop -> {
+                canvas.drawText("⏹ MODULATION STOPPED", marginPx + 16f, marginPx + 30f, stopTextPaint)
+            }
+            !isEffectEnabled -> {
+                canvas.drawText("NORMAL MODE • SPATIAL MODULATION OFF", marginPx + 16f, marginPx + 30f, disabledTextPaint)
+            }
+            else -> {
+                canvas.drawText(
+                    "SPATIAL • ${params.patternType.displayLabel} • ${params.gridPeriodPx}px • ${(params.contrastRatio * 100).toInt()}%",
+                    marginPx + 16f, marginPx + 30f, textPaint
+                )
+            }
+        }
+
         canvas.drawText(
             "SESSION: $experimentId",
             marginPx + 16f, surfaceHeight - marginPx - 16f, textPaint
@@ -248,8 +310,9 @@ class SpatialModulationRenderer(
             surfaceWidth - marginPx to surfaceHeight - marginPx,
             marginPx to surfaceHeight - marginPx
         )
-        for ((idx, c) in corners.withIndex()) {
-            val cx = c.first; val cy = c.second
+        for (c in corners) {
+            val cx = c.first
+            val cy = c.second
             val sz = markerRadiusPx + 8f
             canvas.drawRect(cx - sz, cy - sz, cx + sz, cy + sz, markerWhite)
             canvas.drawRect(cx - sz, cy - sz, cx + sz, cy + sz, framePaint)
@@ -264,5 +327,7 @@ class SpatialModulationRenderer(
         bitmap = null
         patternBitmap?.recycle()
         patternBitmap = null
+        surfaceWidth = 0
+        surfaceHeight = 0
     }
 }
