@@ -11,6 +11,16 @@ export function AuthForm({ isRegister = false }: AuthFormProps) {
   const navigate = useNavigate();
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
+  const [theme, setTheme] = useState<"light" | "dark">(() => {
+    return (document.documentElement.getAttribute("data-theme") as "light" | "dark") || "light";
+  });
+
+  const toggleTheme = () => {
+    const next = theme === "dark" ? "light" : "dark";
+    setTheme(next);
+    document.documentElement.setAttribute("data-theme", next);
+    localStorage.setItem("veil_theme", next);
+  };
 
   async function handleSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -36,7 +46,18 @@ export function AuthForm({ isRegister = false }: AuthFormProps) {
     <main className="auth-container">
       <form onSubmit={handleSubmit} className="auth-card">
         <div className="auth-header">
-          <p className="eyebrow">PRIVATE MESSENGER</p>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+            <p className="eyebrow">VEIL MESSENGER</p>
+            <button
+              type="button"
+              className="btn-icon"
+              onClick={toggleTheme}
+              title={theme === "dark" ? "Switch to light mode" : "Switch to dark mode"}
+              aria-label="Toggle theme"
+            >
+              {theme === "dark" ? "☀️" : "🌙"}
+            </button>
+          </div>
           <h1>{isRegister ? "Create your account" : "Welcome back"}</h1>
           <p className="muted">
             {isRegister

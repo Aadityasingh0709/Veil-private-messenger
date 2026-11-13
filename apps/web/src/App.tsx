@@ -25,6 +25,24 @@ function ChatApp() {
   const [profileOpen, setProfileOpen] = useState(false);
   const [loading, setLoading] = useState(true);
 
+  // Theme State (Dark / Light mode with persistence)
+  const [theme, setTheme] = useState<"light" | "dark">(() => {
+    const saved = localStorage.getItem("veil_theme");
+    if (saved === "dark" || saved === "light") return saved;
+    return typeof window !== "undefined" && window.matchMedia("(prefers-color-scheme: dark)").matches
+      ? "dark"
+      : "light";
+  });
+
+  useEffect(() => {
+    document.documentElement.setAttribute("data-theme", theme);
+    localStorage.setItem("veil_theme", theme);
+  }, [theme]);
+
+  const handleToggleTheme = () => {
+    setTheme((prev) => (prev === "dark" ? "light" : "dark"));
+  };
+
   // Custom Media Viewer Modal State
   const [viewerOpen, setViewerOpen] = useState(false);
   const [viewerUrl, setViewerUrl] = useState("");
@@ -255,6 +273,8 @@ function ChatApp() {
       <aside className={`sidebar ${selected ? "mobile-hidden" : ""}`}>
         <Navigation
           currentUser={me}
+          theme={theme}
+          onToggleTheme={handleToggleTheme}
           onOpenProfile={() => setProfileOpen(true)}
           onLogout={handleLogout}
         />

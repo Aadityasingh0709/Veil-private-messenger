@@ -3,11 +3,19 @@ import { Avatar } from "./Avatar";
 
 interface NavigationProps {
   currentUser: PublicUser;
+  theme: "light" | "dark";
+  onToggleTheme: () => void;
   onOpenProfile: () => void;
   onLogout: () => void;
 }
 
-export function Navigation({ currentUser, onOpenProfile, onLogout }: NavigationProps) {
+export function Navigation({
+  currentUser,
+  theme,
+  onToggleTheme,
+  onOpenProfile,
+  onLogout
+}: NavigationProps) {
   return (
     <header className="sidebar-navigation">
       <div className="nav-profile-trigger" onClick={onOpenProfile} role="button" tabIndex={0}>
@@ -19,6 +27,15 @@ export function Navigation({ currentUser, onOpenProfile, onLogout }: NavigationP
       </div>
 
       <div className="nav-actions">
+        <button
+          type="button"
+          className="btn-icon"
+          onClick={onToggleTheme}
+          title={theme === "dark" ? "Switch to light mode" : "Switch to dark mode"}
+          aria-label={theme === "dark" ? "Switch to light mode" : "Switch to dark mode"}
+        >
+          {theme === "dark" ? "☀️" : "🌙"}
+        </button>
         <button
           type="button"
           className="btn-icon"

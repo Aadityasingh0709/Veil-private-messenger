@@ -26,6 +26,50 @@
   --radius-lg: 16px;
 }
 
+[data-theme="dark"] {
+  --color-primary: #3b82f6;
+  --color-primary-hover: #60a5fa;
+  --color-bg-app: #0b0f19;
+  --color-bg-surface: #111827;
+  --color-bg-subtle: #1f2937;
+  --color-border: #374151;
+  --color-border-subtle: #1f2937;
+  --color-text-main: #f9fafb;
+  --color-text-muted: #9ca3af;
+  --color-text-subtle: #6b7280;
+  --color-online: #10b981;
+  --color-offline: #4b5563;
+  --color-error-bg: #450a0a;
+  --color-error-text: #fca5a5;
+  --color-error-border: #7f1d1d;
+  --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.3);
+  --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.4), 0 2px 4px -2px rgb(0 0 0 / 0.3);
+  --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.5), 0 4px 6px -4px rgb(0 0 0 / 0.4);
+}
+
+[data-theme="dark"] input,
+[data-theme="dark"] select,
+[data-theme="dark"] textarea {
+  color-scheme: dark;
+}
+
+[data-theme="dark"] .composer-input,
+[data-theme="dark"] .auth-input,
+[data-theme="dark"] .search-input {
+  background: var(--color-bg-subtle);
+  color: var(--color-text-main);
+}
+
+[data-theme="dark"] .search-item:hover,
+[data-theme="dark"] .search-item:focus {
+  background: var(--color-bg-subtle);
+}
+
+[data-theme="dark"] .message-actions-trigger:hover,
+[data-theme="dark"] .message-actions-trigger:focus-visible {
+  background: rgba(255, 255, 255, 0.12);
+}
+
 * {
   box-sizing: border-box;
   margin: 0;
@@ -390,7 +434,7 @@ a:hover {
 }
 
 .search-input:focus {
-  background: #ffffff;
+  background: var(--color-bg-surface);
   border-color: var(--color-primary);
   box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.12);
 }
@@ -410,7 +454,7 @@ a:hover {
   margin-top: 8px;
   border: 1px solid var(--color-border);
   border-radius: var(--radius-md);
-  background: #ffffff;
+  background: var(--color-bg-surface);
   box-shadow: var(--shadow-md);
   max-height: 220px;
   overflow-y: auto;
@@ -538,7 +582,7 @@ a:hover {
   min-height: 0;
   min-width: 0;
   overflow: hidden;
-  background: #ffffff;
+  background: var(--color-bg-app);
 }
 
 .chat-thread.empty-thread {
@@ -554,7 +598,7 @@ a:hover {
   gap: 12px;
   padding: 14px 20px;
   border-bottom: 1px solid var(--color-border);
-  background: #ffffff;
+  background: var(--color-bg-surface);
   z-index: 2;
 }
 
@@ -642,7 +686,7 @@ a:hover {
 }
 
 .bubble-theirs {
-  background: #ffffff;
+  background: var(--color-bg-surface);
   color: var(--color-text-main);
   border: 1px solid var(--color-border);
   border-bottom-left-radius: 2px;
@@ -691,7 +735,7 @@ a:hover {
   padding: 4px;
   border: 1px solid var(--color-border);
   border-radius: var(--radius-md);
-  background: #ffffff;
+  background: var(--color-bg-surface);
   box-shadow: var(--shadow-md);
 }
 
@@ -742,7 +786,7 @@ a:hover {
   gap: 10px;
   padding: 14px 20px;
   border-top: 1px solid var(--color-border);
-  background: #ffffff;
+  background: var(--color-bg-surface);
 }
 
 .composer-input {
@@ -884,7 +928,7 @@ a:hover {
 .modal-card {
   width: 100%;
   max-width: 440px;
-  background: #ffffff;
+  background: var(--color-bg-surface);
   border-radius: var(--radius-lg);
   box-shadow: var(--shadow-lg);
   overflow: hidden;
@@ -1019,7 +1063,7 @@ a:hover {
   display: flex;
   flex-direction: column;
   flex-shrink: 0;
-  background: #ffffff;
+  background: var(--color-bg-surface);
   border-top: 1px solid var(--color-border);
 }
 
