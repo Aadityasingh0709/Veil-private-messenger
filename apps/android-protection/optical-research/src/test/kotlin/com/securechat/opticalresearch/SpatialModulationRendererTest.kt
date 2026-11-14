@@ -244,4 +244,36 @@ class SpatialModulationRendererTest {
         assertEquals("DIAGONAL_LINES", modParams.spatialPattern)
         assertEquals(12, modParams.gridPeriodPx)
     }
+
+    @Test
+    fun testInvalidSpatialParameterRejection() {
+        val invalidContrast = ModulationParams.Spatial(contrastRatio = 0.20f)
+        assertNotNull("Contrast > 0.15 must be rejected", invalidContrast.validate())
+
+        val negativeContrast = ModulationParams.Spatial(contrastRatio = -0.05f)
+        assertNotNull("Negative contrast must be rejected", negativeContrast.validate())
+
+        val smallPeriod = ModulationParams.Spatial(gridPeriodPx = 1)
+        assertNotNull("Period < 2px must be rejected", smallPeriod.validate())
+
+        val largePeriod = ModulationParams.Spatial(gridPeriodPx = 128)
+        assertNotNull("Period > 64px must be rejected", largePeriod.validate())
+
+        val invalidOrientation = ModulationParams.Spatial(orientationDeg = 185f)
+        assertNotNull("Orientation >= 180 deg must be rejected", invalidOrientation.validate())
+    }
+
+    @Test
+    fun testPatternDeterminism() {
+        val pattern = SpatialPatternType.CHECKERBOARD
+        val period = 16
+        val contrast = 0.10f
+
+        // Same coordinates and parameters must always yield identical perturbation
+        for (i in 0 until 50) {
+            val v1 = SpatialPatternMath.computeLuminancePerturbation(25, 42, 1080, 1920, pattern, period, contrast)
+            val v2 = SpatialPatternMath.computeLuminancePerturbation(25, 42, 1080, 1920, pattern, period, contrast)
+            assertEquals("Pattern math must be 100% deterministic", v1, v2, 0.0f)
+        }
+    }
 }

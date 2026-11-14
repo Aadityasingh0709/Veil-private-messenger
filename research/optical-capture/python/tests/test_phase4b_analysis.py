@@ -157,3 +157,35 @@ def test_phase4b_schema_validation():
 
     # Should validate without raising an exception
     jsonschema.validate(instance=manifest_data, schema=schema)
+
+
+def test_spatial_renderer_simulation_and_boundary_integrity():
+    """Verifies spatial modulation mathematically perturbs content while preserving margins and edges."""
+    from audit_spatial_renderer import render_normal_baseline, render_spatial_modulation
+    from metrics import calculate_psnr, calculate_ssim
+
+    # Create dummy reference chart (1080x1920)
+    ref_img = np.full((1920, 1080, 3), 200, dtype=np.uint8)
+    cv2.putText(ref_img, "TEST TARGET", (200, 960), cv2.FONT_HERSHEY_SIMPLEX, 2.0, (20, 20, 20), 4)
+
+    normal_img, (left, top, dw, dh) = render_normal_baseline(ref_img, "EXP-TEST")
+    spatial_img, _ = render_spatial_modulation(ref_img, "EXP-TEST", pattern="CHECKERBOARD", period=8, contrast=0.08)
+
+    # Content within dstRect should differ
+    roi_normal = normal_img[top:top+dh, left:left+dw]
+    roi_spatial = spatial_img[top:top+dh, left:left+dw]
+    psnr = calculate_psnr(roi_normal, roi_spatial)
+    assert 20.0 < psnr < 35.0, f"Expected PSNR in [20, 35] dB, got {psnr}"
+
+    ssim = calculate_ssim(roi_normal, roi_spatial)
+    assert 0.20 < ssim < 0.90, f"Expected SSIM in [0.2, 0.9], got {ssim}"
+
+    # Content outside dstRect (margins) must be 100% untouched
+    margin_diff_bottom = np.max(np.abs(normal_img[top+dh:, :] - spatial_img[top+dh:, :]))
+    margin_diff_left = np.max(np.abs(normal_img[top:top+dh, 0:left] - spatial_img[top:top+dh, 0:left]))
+    margin_diff_right = np.max(np.abs(normal_img[top:top+dh, left+dw:] - spatial_img[top:top+dh, left+dw:]))
+
+    assert margin_diff_bottom == 0
+    assert margin_diff_left == 0
+    assert margin_diff_right == 0
+
